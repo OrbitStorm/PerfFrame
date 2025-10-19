@@ -1,0 +1,14 @@
+## Title: PerfFrame
+## Version: 1.0
+## Author: Sawfty
+## License: MIT
+## Interface: 110205
+## Notes: Lightweight FPS and latency tracker for World of Warcraft.
+## Inspired by Pytilix's FPS-MS-Tracker
+## DefaultState: Enabled
+## SavedVariables: PerfFrameDB
+## X-Category: Interface Enhancements
+## IconTexture: Interface\AddOns\PerfFrame\icon.tga
+
+PerfFrame.lua
+PerfFrameOptions.lua
