@@ -2,7 +2,7 @@
 
 PerfFrame is a lightweight addon that keeps your FPS and latency visible at all times. It provides a simple, movable display for performance stats, so you don’t need to hover over the default UI to check your frame rate or connection.
 
-Inspired by Pytilix’s FPS-MS-Tracker, PerfFrame has been fully rewritten with persistent settings, accessibility options, quality-of-life updates, and an in-game configuration panel.
+Inspired by [Pytilix’s](https://www.curseforge.com/members/pytilix/projects) [FPS-MS-Tracker](https://www.curseforge.com/wow/addons/fps-ms-tracker), PerfFrame has been fully rewritten with persistent settings, accessibility options, quality-of-life updates, and an in-game configuration panel.
 
 ### Features
 * Real-time FPS and latency tracking
@@ -24,3 +24,19 @@ PerfFrame includes multiple text-scale options to improve visibility on any disp
   World of Warcraft/_retail_/Interface/AddOns/
 * Enable PerfFrame in the AddOns menu.
 * Type /perf help in-game for a list of available commands.
+
+### Moving PerfFrame
+Hold ALT + left-click and drag. It's that simple!
+
+### Slash Commands /perf or /PerfFrame
+* /perf help - prints a list of available commands
+* /perf reset - resets the panel to the default position
+* /perf show fps - shows just FPS on the panel
+* /perf show ms - shows just latency (MS) on the panel
+* /perf show both - shows FPS and MS (default)
+* /perf text [normal|bigger|biggest] - adjusts text scaling from 100% to 125% and 150%
+* /perf tooltip on/off - toggle's the optional addon and network stats tooltip on hover
+* /perf clock on/off/12h/24h - toggles the optional clock display on the panel on or off, as well as toggles between 12h and 24h formats
+* /perf mail on/off - togglesd an optional mail icon on the display for unread mail
+
+PerfFrame also has a fully functional settings page available through Options → Addons → PerfFrame
