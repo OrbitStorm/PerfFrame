@@ -1,7 +1,7 @@
 -- =========================================
 -- PerfFrame Options Panel
 -- =========================================
-local addonVersion = "v1.0"
+local addonVersion = "v1.1"
 
 local panel = CreateFrame("Frame")
 panel.name = "PerfFrame" -- side panel name
@@ -20,7 +20,8 @@ local function newCheckbox(idSuffix, label, dbKey, parent, description)
         PerfFrameDB[dbKey] = self:GetChecked()
         if dbKey == "showTooltip" then
             if PerfFrameDB.showTooltip then
-                PerfFrame:SetScript("OnEnter", setupTooltip)
+                -- Call setup function to (re)bind proper handlers
+                setupTooltip()
             else
                 PerfFrame:SetScript("OnEnter", nil)
                 GameTooltip:Hide()
@@ -51,7 +52,7 @@ panel:SetScript("OnShow", function(self)
     fpsCB:SetPoint("TOPLEFT", title, "BOTTOMLEFT", -2, -16)
 fpsCB:SetScript("OnClick", function(self)
     PerfFrameDB.showFPS = self:GetChecked()
-    showMode = (PerfFrameDB.showFPS and PerfFrameDB.showMS) and "both"
+    local showMode = (PerfFrameDB.showFPS and PerfFrameDB.showMS) and "both"
               or (PerfFrameDB.showFPS and not PerfFrameDB.showMS) and "fps"
               or (not PerfFrameDB.showFPS and PerfFrameDB.showMS) and "ms"
               or "none"
@@ -62,7 +63,7 @@ end)
     msCB:SetPoint("TOPLEFT", fpsCB, "BOTTOMLEFT", 0, -8)
     msCB:SetScript("OnClick", function(self)
     PerfFrameDB.showMS = self:GetChecked()
-    showMode = (PerfFrameDB.showFPS and PerfFrameDB.showMS) and "both"
+    local showMode = (PerfFrameDB.showFPS and PerfFrameDB.showMS) and "both"
               or (PerfFrameDB.showFPS and not PerfFrameDB.showMS) and "fps"
               or (not PerfFrameDB.showFPS and PerfFrameDB.showMS) and "ms"
               or "none"
@@ -82,7 +83,7 @@ end)
 
     -- Text Scale dropdown
     local textScaleDropdown = CreateFrame("Frame", "PerfFrameTextScaleDropdown", panel, "UIDropDownMenuTemplate")
-    textScaleDropdown:SetPoint("TOPLEFT", mailCB, "BOTTOMLEFT", -15, -10) -- aligned vertically
+    textScaleDropdown:SetPoint("TOPLEFT", mailCB, "BOTTOMLEFT", -15, -10)
     UIDropDownMenu_SetWidth(textScaleDropdown, 120)
     UIDropDownMenu_SetText(textScaleDropdown, "Display Scale")
 
@@ -94,8 +95,7 @@ end)
             info.checked = (PerfFrameDB.textScale and PerfFrameDB.textScale:lower() == scale:lower())
             info.func = function()
                 PerfFrameDB.textScale = scale:lower()
-                PerfFrameTextScale = scale:lower()
-                UIDropDownMenu_SetText(textScaleDropdown, "Display Scale")
+                PerfFrameTextScale = PerfFrameDB.textScale -- added for consistency (sync local with saved)
                 if PerfFrame.text and PerfFrame.text.SetFont then
                     local font, _, flags = PerfFrame.text:GetFont()
                     local baseSize = 12
@@ -113,6 +113,47 @@ end)
     local versionText = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     versionText:SetPoint("BOTTOMLEFT", 16, 16)
     versionText:SetText("Version: "..addonVersion)
+
+    -- =========================================
+    -- Reset Button
+    -- =========================================
+    local resetButton = CreateFrame("Button", "PerfFrameResetButton", panel, "UIPanelButtonTemplate")
+    resetButton:SetSize(100, 22)
+    resetButton:SetText("Reset Position")
+    resetButton:SetPoint("BOTTOMRIGHT", -16, 16)
+    resetButton:SetScript("OnClick", function()
+        StaticPopup_Show("PERFFRAME_RESET_CONFIRM")
+    end)
+end)
+
+-- =========================================
+-- Reset Confirmation Popup (registered once)
+-- =========================================
+StaticPopupDialogs["PERFFRAME_RESET_CONFIRM"] = {
+    text = "Reset PerfFrame position to center?",
+    button1 = "Yes",
+    button2 = "Cancel",
+    OnAccept = function()
+        PerfFrame:ClearAllPoints()
+        local def = { point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", x = 0, y = 0 }
+        PerfFrameDB.framePos = def
+        PerfFrame:SetPoint(def.point, _G[def.relativeTo] or UIParent, def.relativePoint, def.x, def.y)
+        print("PerfFrame position reset to center.")
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
+-- Let's center this on the screen so it's more noticeable
+hooksecurefunc("StaticPopup_Show", function(which)
+    if which == "PERFFRAME_RESET_CONFIRM" then
+        local popup = StaticPopup_FindVisible(which)
+        if popup then
+            popup:ClearAllPoints()
+            popup:SetPoint("CENTER", UIParent, "CENTER", 0, 0) -- true center, always
+        end
+    end
 end)
 
 -- Register panel with WoW's Interface Options

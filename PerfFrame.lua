@@ -1,5 +1,5 @@
 -- =========================================
--- PerfFrame v1.0
+-- PerfFrame v1.1
 -- inspired by Pytilix's FPS-MS-Tracker
 -- =========================================
 
@@ -12,8 +12,16 @@ PerfFrameDB = PerfFrameDB or {
     showMail = false,
 	showFPS = true,
     showMS = true,
-    framePos = { point = "BOTTOMRIGHT", relativeTo = "UIParent", x = -315, y = 5 }
+    framePos = { point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", x = 0, y = 0 }
 }
+
+-- Ensure v1.0 users have a valid position structure
+if not PerfFrameDB.framePos.relativePoint then
+    PerfFrameDB.framePos.relativePoint = PerfFrameDB.framePos.point or "CENTER"
+end
+if not PerfFrameDB.framePos.relativeTo or type(PerfFrameDB.framePos.relativeTo) ~= "string" then
+    PerfFrameDB.framePos.relativeTo = "UIParent"
+end
 
 -- Ensure clockFormat defaults to 12h if nil
 if not PerfFrameDB.clockFormat then
@@ -27,32 +35,9 @@ PerfFrame:EnableMouse(true)
 -- Movable configuration
 local movable = true
 local frame_anchor = "TOP" -- Not currently used for dynamic positioning
-
-if movable then
-    PerfFrame:SetClampedToScreen(true)
-    PerfFrame:SetMovable(true)
-    PerfFrame:SetUserPlaced(true)
-    -- Restore saved position
-    local pos = PerfFrameDB.framePos
-    PerfFrame:ClearAllPoints()
-    PerfFrame:SetPoint(pos.point, pos.relativeTo, pos.x, pos.y)
-    PerfFrame:SetScript("OnMouseDown", function(self)
-        if IsAltKeyDown() then self:StartMoving() end
-    end)
-    PerfFrame:SetScript("OnMouseUp", function(self)
-        self:StopMovingOrSizing()
-        -- Save position
-        local p, rt, _, x, y = self:GetPoint()
-        PerfFrameDB.framePos = { point = p, relativeTo = rt:GetName(), x = x, y = y }
-    end)
-else
-    PerfFrame:ClearAllPoints()
-    PerfFrame:SetPoint("LEFT", WorldFrame, "BOTTOMLEFT", 0, 10)
-end
-
 -- Visibility and display state
 --local showTooltip = PerfFrameDB.showTooltip
-PerfFrameTextScale = PerfFrameDB.textScale
+local PerfFrameTextScale = PerfFrameDB.textScale
 
 -- Text scale multiplier
 local function GetTextScaleMultiplier()
@@ -81,17 +66,56 @@ local function GetShowMode()
 end
 
 -- =========================================
+-- Frame positioning
+-- =========================================
+if movable then
+    PerfFrame:SetClampedToScreen(true)
+    PerfFrame:SetMovable(true)
+    PerfFrame:SetUserPlaced(true)
+
+    -- Restore saved position
+    local pos = PerfFrameDB.framePos
+    PerfFrame:ClearAllPoints()
+    PerfFrame:SetPoint(
+    	pos.point or "CENTER",
+    	_G[pos.relativeTo] or UIParent,
+    	pos.relativePoint or pos.point or "CENTER",
+    	pos.x or 0,
+    	pos.y or 0
+    )
+
+    PerfFrame:SetScript("OnMouseDown", function(self)
+        if IsAltKeyDown() then self:StartMoving() end
+    end)
+
+    PerfFrame:SetScript("OnMouseUp", function(self)
+        self:StopMovingOrSizing()
+        -- Save position (nil-safe)
+        local p, rt, rp, x, y = self:GetPoint()
+        PerfFrameDB.framePos = {
+        	point = p,
+        	relativeTo = (rt and rt.GetName and rt:GetName()) or "UIParent",
+        	relativePoint = rp or p,
+        	x = x, y = y
+        }
+    end)
+else
+    PerfFrame:ClearAllPoints()
+    PerfFrame:SetPoint("LEFT", WorldFrame, "BOTTOMLEFT", 0, 10)
+end
+
+-- =========================================
 -- Slash command handler
 -- =========================================
 SLASH_PERFFRAME1 = "/perf"
 SlashCmdList["PERFFRAME"] = function(msg)
-
     msg = msg:lower()
     if msg == "reset" then
         PerfFrame:ClearAllPoints()
-        local default = PerfFrameDB.framePos
-        PerfFrame:SetPoint(default.point, default.relativeTo, default.x, default.y)
-        print("PerfFrame position reset to default.")
+        local def = { point="CENTER", relativeTo="UIParent", relativePoint="CENTER", x=0, y=0 }
+        PerfFrameDB.framePos = def
+        PerfFrame:SetPoint(def.point, _G[def.relativeTo] or UIParent, def.relativePoint, def.x, def.y)
+        print("PerfFrame position reset to center.")
     elseif msg == "show fps" then
         PerfFrameDB.showFPS = true
         PerfFrameDB.showMS = false
@@ -107,8 +131,8 @@ SlashCmdList["PERFFRAME"] = function(msg)
     elseif msg:find("text") then
         local scale = msg:match("text%s+(%a+)")
         if scale == "normal" or scale == "bigger" or scale == "biggest" then
-            PerfFrameTextScale = scale
             PerfFrameDB.textScale = scale
+        PerfFrameTextScale = PerfFrameDB.textScale
             if PerfFrame.text and PerfFrame.text.SetFont then
                 local font, _, flags = PerfFrame.text:GetFont()
                 local baseSize = 12
@@ -134,7 +158,7 @@ SlashCmdList["PERFFRAME"] = function(msg)
         showTooltip = PerfFrameDB.showTooltip
         setupTooltip()
     elseif msg:find("clock") then
-    local toggle = msg:match("^clock%s*(%w+)$")
+        local toggle = msg:match("clock%s*(%S*)")
         if toggle == "on" then
             PerfFrameDB.showClock = true
             print("PerfFrame clock display enabled.")
@@ -149,8 +173,7 @@ SlashCmdList["PERFFRAME"] = function(msg)
             PerfFrameDB.clockFormat = "24h"
             PerfFrameDB.showClock = true
             print("PerfFrame clock format set to 24h.")
-	    elseif toggle == nil then
-        	-- only toggle display if no argument provided
+	    elseif toggle == nil or toggle == "" then
             PerfFrameDB.showClock = not PerfFrameDB.showClock
             print("PerfFrame clock display " .. (PerfFrameDB.showClock and "enabled" or "disabled") .. ".")
         end
@@ -205,12 +228,11 @@ CF:SetScript("OnEvent", function(self, event)
     local textAlign = "CENTER"
     local customColor = true
     local useShadow = false
-
     local fontSize = baseFontSize * GetTextScaleMultiplier()
 
     -- Determine color
     local color
-    if customColor == false then
+    if not customColor then
         color = { r = 1, g = 1, b = 1 }
     else
         local _, class = UnitClass("player")
@@ -219,7 +241,6 @@ CF:SetScript("OnEvent", function(self, event)
 
     -- Gradient for memory usage
     local gradientColor = { 0,1,0, 1,1,0, 1,0,0 }
-
     local function RGBGradient(num)
         local perc = math.min(num,1)
         local r1,g1,b1,r2,g2,b2,r3,g3,b3 = unpack(gradientColor)
@@ -239,25 +260,11 @@ CF:SetScript("OnEvent", function(self, event)
         end
     end
 
-    local function getFPS()
-        return "|c00ffffff"..floor(GetFramerate()).."|r fps"
-    end
-
-    local function getLatencyRaw()
-        return select(3, GetNetStats())
-    end
-
-    local function getLatencyWorldRaw()
-        return select(4, GetNetStats())
-    end
-
-    local function getLatency()
-        return "|c00ffffff"..getLatencyRaw().."|r ms"
-    end
-
-    local function getLatencyWorld()
-        return "|c00ffffff"..getLatencyWorldRaw().."|r ms"
-    end
+    local function getFPS() return "|c00ffffff"..floor(GetFramerate()).."|r fps" end
+    local function getLatencyRaw() return select(3, GetNetStats()) end
+    local function getLatencyWorldRaw() return select(4, GetNetStats()) end
+    local function getLatency() return "|c00ffffff"..getLatencyRaw().."|r ms" end
+    local function getLatencyWorld() return "|c00ffffff"..getLatencyWorldRaw().."|r ms" end
 
     local function getTime()
         if PerfFrameDB.showClock then
@@ -282,7 +289,6 @@ CF:SetScript("OnEvent", function(self, event)
     end
         return ""
     end
-
 
     -- =========================================
     -- Tooltip setup
@@ -326,9 +332,13 @@ CF:SetScript("OnEvent", function(self, event)
                     GameTooltip:AddDoubleLine("Local", getLatencyRaw().." ms",1,1,1, RGBGradient(getLatencyRaw()/100))
                     GameTooltip:AddDoubleLine("World", getLatencyWorldRaw().." ms",1,1,1, RGBGradient(getLatencyWorldRaw()/100))
                 end)
+
+            -- Added safety handling for tooltip errors
                 if not success then
-                    GameTooltip:AddLine("Tooltip error: "..err,1,0,0)
+                	GameTooltip:ClearLines()
+                GameTooltip:AddLine("Tooltip error: " .. tostring(err), 1, 0, 0)
                 end
+
                 GameTooltip:Show()
             end)
             PerfFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -374,5 +384,4 @@ CF:SetScript("OnEvent", function(self, event)
             self:SetHeight(PerfFrame.text:GetStringHeight())
         end
     end)
-
 end)
