@@ -1,11 +1,14 @@
 -- =========================================
 -- PerfFrame Options Panel
 -- =========================================
-local addonVersion = "v2.3.0"
+local addonName = ...
+local addonVersion = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version"))
+    or (GetAddOnMetadata and GetAddOnMetadata(addonName, "Version"))
+    or "unknown"
 
--- -------------------------------------------------
+-- =========================================
 -- Helpers
--- -------------------------------------------------
+-- =========================================
 local spacing = 20
 
 -- Slider value highlight colors (use text defaults at runtime; gold matches label tone)
@@ -98,7 +101,6 @@ local function GetBackgroundOpacity()
     return tonumber(PerfFrameDB.backgroundOpacity) or 0
 end
 
-
 local function SkinMinimalCheckbox(cb)
     -- Avoid SetCheckedAtlas (not available on all clients). Use checked texture atlas instead.
     cb:SetNormalAtlas("checkbox-minimal", true)
@@ -115,7 +117,6 @@ local function SkinMinimalCheckbox(cb)
     end
 
 end
-
 
 local function CreateColorSwatchButton(parentRow, getColorFunc, setColorFunc)
     local btn = CreateFrame("Button", nil, parentRow)
@@ -211,12 +212,11 @@ local function CreateColorSwatchButton(parentRow, getColorFunc, setColorFunc)
     return btn
 end
 
--- -------------------------------------------------
+-- =========================================
 -- Options Canvas
--- -------------------------------------------------
+-- =========================================
 local Home = CreateFrame("Frame")
 Home:Hide()
-
 
 Home:SetScript("OnHide", function(self)
     if self._headerMask and SettingsPanel and SettingsPanel.Bg and SettingsPanel.Bg.TopSection then
@@ -321,7 +321,7 @@ Home:SetScript("OnShow", function(self)
         self._headerMask = mask
 
         local logo = boundingBox:CreateTexture(nil, "ARTWORK")
-        logo:SetTexture("Interface\\AddOns\\PerfFrame\\icon64.tga", "CLAMP", "CLAMP", "TRILINEAR")
+        logo:SetTexture("Interface\\AddOns\\PerfFrame\\assets\\icon64.tga", "CLAMP", "CLAMP", "TRILINEAR")
         -- keep the logo inside banner bounds
         logo:SetPoint("TOPRIGHT", -12, -4)
         logo:SetSize(54, 54)
@@ -355,7 +355,6 @@ Home:SetScript("OnShow", function(self)
     end
 
     -- Content area (scrollable)
-
     local scrollFrame = CreateFrame("Frame", nil, self, "WowScrollBox")
     scrollFrame:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -60)
     scrollFrame:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -36, 10)
@@ -379,7 +378,7 @@ Home:SetScript("OnShow", function(self)
     contents:SetPoint("TOPLEFT")
     contents:SetPoint("RIGHT")
 
-    -- Helper to force a consistent scroll range once the full UI is built.
+    -- Helper to force a consistent scroll range once the full UI is built
     local function UpdateScrollRange(lastFrame)
         if not lastFrame or not lastFrame.GetBottom then return end
         local top = contents:GetTop()
@@ -400,7 +399,7 @@ Home:SetScript("OnShow", function(self)
     configurationFrame:SetPoint("LEFT")
     configurationFrame:SetPoint("RIGHT")
     configurationFrame:SetPoint("TOP", configurationTitle, "BOTTOM", 0, 0)
-    -- TIP line
+    -- add a tip for users
     local tipFrame = CreateFrame("Frame", nil, configurationFrame)
     tipFrame:SetPoint("TOPLEFT")
     tipFrame:SetPoint("RIGHT")
@@ -411,7 +410,7 @@ Home:SetScript("OnShow", function(self)
     tipFrame.Label:SetText("|cFFFF0000TIP:|r You can access these settings quickly by using the |cffffd200/pf|r command.")
 
 
--- Row builder
+-- row builder
 local function CreateRow(parent, anchorFrame, labelText)
     local row = CreateFrame("Frame", nil, parent)
     if anchorFrame then
@@ -428,9 +427,9 @@ local function CreateRow(parent, anchorFrame, labelText)
     return row
 end
 
--- -----------------------------------------
--- 1) Disable PerfFrame
--- -----------------------------------------
+-- =========================================
+-- PerfFrame Visibility
+-- =========================================
 local disableRow = CreateRow(configurationFrame, nil, "Disable PerfFrame")
 local disableCB = CreateFrame("CheckButton", nil, disableRow, "UICheckButtonTemplate")
 disableCB:SetSize(30, 29)
@@ -454,9 +453,9 @@ AttachTooltip({
     "Hides the PerfFrame display.",
 }, disableRow.Label)
 
--- -----------------------------------------
--- 2) Frame Information
--- -----------------------------------------
+-- =========================================
+-- Frame Information
+-- =========================================
 local frameInfoRow = CreateRow(configurationFrame, disableRow, "Frame Information")
 
 local function GetFrameInfoValue()
@@ -511,9 +510,9 @@ function frameInfoPopout:SetSelectedValue(val)
     end
 end
 
--- -----------------------------------------
--- 4) Combat Toggle
--- -----------------------------------------
+-- =========================================
+-- Combat Toggles
+-- =========================================
 local combatRow = CreateRow(configurationFrame, frameInfoRow, "Combat Toggle")
 
 local function GetCombatModeValue()
@@ -555,9 +554,9 @@ function combatPopout:SetSelectedValue(val)
     end
 end
 
--- -----------------------------------------
--- 5) Hide Until Mouseover
--- -----------------------------------------
+-- =========================================
+-- Hide Until Mouseover
+-- =========================================
 local hoverRow = CreateRow(configurationFrame, combatRow, "Hide Until Mouseover")
 local hoverCB = CreateFrame("CheckButton", nil, hoverRow, "UICheckButtonTemplate")
 hoverCB:SetSize(30, 29)
@@ -574,9 +573,9 @@ AttachTooltip({
     "When enabled, the frame is hidden until you hover your mouse over it.",
 }, hoverRow.Label)
 
--- -----------------------------------------
--- 6) Show Addon Memory
--- -----------------------------------------
+-- =========================================
+-- Show Addon Memory
+-- =========================================
 local addonMemRow = CreateRow(configurationFrame, hoverRow, "Show Addon Memory")
 local addonMemCB = CreateFrame("CheckButton", nil, addonMemRow, "UICheckButtonTemplate")
 addonMemCB:SetSize(30, 29)
@@ -593,9 +592,9 @@ AttachTooltip({
     "When enabled, the tooltip will include an AddOn memory usage list.",
 }, addonMemRow.Label)
 
--- -----------------------------------------
--- 6b) AddOn Memory List
--- -----------------------------------------
+-- =========================================
+-- AddOn Memory List
+-- =========================================
 local addonMemListRow = CreateRow(configurationFrame, addonMemRow, "AddOn Memory List")
 
 local function GetAddonMemListValue()
@@ -629,9 +628,9 @@ AttachTooltip({
     "Hold Shift while hovering to show all entries.",
 }, addonMemListRow.Label)
 
--- -----------------------------------------
--- 8) Font Scale
--- -----------------------------------------
+-- =========================================
+-- Font Scaling
+-- =========================================
 local fontScaleRow = CreateRow(configurationFrame, addonMemListRow, "Font Scale")
 local fontScaleSlider = CreateFrame("Frame", nil, fontScaleRow, "MinimalSliderWithSteppersTemplate")
 fontScaleSlider:Init(GetFontScale(), 0.5, 2, 100)
@@ -664,17 +663,6 @@ do
     end
 end
 
-
---local smallLabel = fontScaleRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
---smallLabel:SetPoint("BOTTOMLEFT", fontScaleSlider.Slider, "BOTTOMLEFT", 0, -2)
---smallLabel:SetTextColor(1, 1, 1, 1)
---smallLabel:SetText("Small")
-
---local largeLabel = fontScaleRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
---largeLabel:SetPoint("BOTTOMRIGHT", fontScaleSlider.Slider, "BOTTOMRIGHT", 0, -2)
---largeLabel:SetTextColor(1, 1, 1, 1)
---largeLabel:SetText("Large")
-
 local function PerfFrame_FontScale_OnValueChanged(_, value)
     ApplyFontScale(value)
     fontValue:SetText(tostring(PerfFrameDB.fontSize or math.floor((12 * GetFontScale()) + 0.5)))
@@ -688,10 +676,9 @@ AttachTooltip({
     "Adjust the size of the text in the frame.",
 }, fontScaleRow.Label)
 
-
--- -----------------------------------------
--- 9) Background Opacity
--- -----------------------------------------
+-- =========================================
+-- Background Opacity
+-- =========================================
 local bgOpacityRow = CreateRow(configurationFrame, fontScaleRow, "Background Opacity")
 self._bgOpacityRow = bgOpacityRow
 local bgOpacitySlider = CreateFrame("Frame", nil, bgOpacityRow, "MinimalSliderWithSteppersTemplate")
@@ -725,17 +712,6 @@ do
     end
 end
 
-
---local zeroLabel = bgOpacityRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
---zeroLabel:SetPoint("BOTTOMLEFT", bgOpacitySlider.Slider, "BOTTOMLEFT", 0, -2)
---zeroLabel:SetTextColor(1, 1, 1, 1)
---zeroLabel:SetText("0")
-
---local hundredLabel = bgOpacityRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
---hundredLabel:SetPoint("BOTTOMRIGHT", bgOpacitySlider.Slider, "BOTTOMRIGHT", 0, -2)
---hundredLabel:SetTextColor(1, 1, 1, 1)
---hundredLabel:SetText("100")
-
 local function PerfFrame_BgOpacity_OnValueChanged(_, value)
     value = math.floor((tonumber(value) or 0) + 0.5)
     ApplyBackgroundOpacity(value)
@@ -751,10 +727,9 @@ AttachTooltip({
     "0 = no background, 100 = solid.",
 }, bgOpacityRow.Label)
 
--- -----------------------------------------
--- -----------------------------------------
--- 8b) Text Colors
--- -----------------------------------------
+-- =========================================
+-- Text Colors
+-- =========================================
 local textColorsRow = CreateRow(configurationFrame, bgOpacityRow, "Text Colors")
 
 local function GetTextColorModeValue()
@@ -834,16 +809,16 @@ AttachTooltip({
     "Used when Text Colors is set to Custom: Separate (FPS/MS).",
 }, msColorRow.Label)
 
--- Small helper to enable/disable the relevant swatches without reflowing layout
+-- enable/disable the relevant swatches without reflowing layout
 function Home:_UpdateTextColorControls()
     local mode = GetTextColorModeValue()
 
-    -- Show/hide rows based on selection
+    -- show/hide rows based on selection
     if self._oneColorRow then self._oneColorRow:SetShown(mode == "CUSTOM_BOTH") end
     if self._fpsColorRow then self._fpsColorRow:SetShown(mode == "CUSTOM_SPLIT") end
     if self._msColorRow then self._msColorRow:SetShown(mode == "CUSTOM_SPLIT") end
 
-    -- Re-anchor the optional rows so spacing stays correct (prevents overlap/smushing)
+    -- re-anchor the optional rows so spacing stays correct
     if self._oneColorRow then
         self._oneColorRow:ClearAllPoints()
         self._oneColorRow:SetPoint("TOPLEFT", textColorsRow, "BOTTOMLEFT", 0, -8)
@@ -860,7 +835,7 @@ function Home:_UpdateTextColorControls()
         self._msColorRow:SetPoint("RIGHT")
     end
 
-    -- Re-anchor rows that follow Text Colors to the last visible row in the Text Colors block
+    -- re-anchor rows that follow Text Colors to the last visible row in the Text Colors block
     local lastRow = textColorsRow
     if mode == "CUSTOM_BOTH" and self._oneColorRow then
         lastRow = self._oneColorRow
@@ -874,7 +849,7 @@ function Home:_UpdateTextColorControls()
         self._customPosRow:SetPoint("RIGHT")
     end
 
-    -- Enable/disable the relevant swatches
+    -- enable/disable the relevant swatches again
     local function SetBtnEnabled(btn, enabled)
         if not btn then return end
         if enabled then btn:Enable() else btn:Disable() end
@@ -918,7 +893,7 @@ useCustomCB:SetScript("OnClick", function(btn)
             }
         end
 
-        -- Legacy field
+        -- legacy field
         PerfFrameCharDB.framePos = PerfFrameCharDB.framePosByMode[modeKey]
     end
 
@@ -934,8 +909,9 @@ AttachTooltip({
     "When enabled, the frame position becomes specific to this character.",
 }, customPosRow.Label)
 
--- 10) Reset Frame Position
--- -----------------------------------------
+-- =========================================
+-- Reset Frame Position
+-- =========================================
 local resetRow = CreateRow(configurationFrame, customPosRow, "Reset Position")
 resetRow:SetHeight(resetRow:GetHeight() + 10) -- add a buffer to avoid encroaching on the slider
 local resetBtn = CreateFrame("Button", nil, resetRow, "UIPanelButtonTemplate")
@@ -983,14 +959,14 @@ AttachTooltip({
     "Resets the frame position to the default center point.",
 }, resetRow.Label)
 
-
-    -- Ensure Text Colors conditional rows are laid out correctly on first open/reload
+    -- ensure Text Colors conditional rows are laid out correctly on first open/reload
     if self._UpdateTextColorControls then
         self:_UpdateTextColorControls()
     end
--- -----------------------------------------
+
+-- =========================================
 -- Credits
--- -----------------------------------------
+-- =========================================
 local creditsTitle = CreateOptionsTitle(contents, "Credits", resetRow)
 local creditsFrame = CreateFrame("Frame", nil, contents, "ResizeLayoutFrame")
 creditsFrame:SetPoint("LEFT")
@@ -1008,16 +984,17 @@ creditsText:SetJustifyH("LEFT")
 creditsText:SetPoint("TOPLEFT", 16, -8)
 creditsText:SetPoint("RIGHT", -16, 0)
 creditsText:SetText(
-    "|cFFFFFFFFPerfFrame|r is a small, customizable and movable frame for FPS, latency, and more.\n\n" ..
+    "|cFFFFFFFFPerfFrame|r is a lightweight frame that displays your FPS and latency,\n\n" ..
+    "    |cFFD8B36Aso you can blame lag with confidence.|r\n\n" ..
     "Created by |cFFFFFFFFSawfty|r. Inspired by FPS-MS-Tracker.\n\n" ..
-    "Thanks to TomCat for UI inspiration."
+    "Special thanks to |cFF8C1010TomCat|r for inspiration on the settings panel layout."
 )
 
 end)
 
--- -------------------------------------------------
+-- =========================================
 -- Settings Registration
--- -------------------------------------------------
+-- =========================================
 local function RegisterPanel(p)
     if InterfaceOptions_AddCategory then
         InterfaceOptions_AddCategory(p)

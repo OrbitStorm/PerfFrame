@@ -1,5 +1,5 @@
 -- =========================================
--- PerfFrame v2.3.0
+-- PerfFrame - The Mainframe 
 -- =========================================
 
 -- Initialize SavedVariables
@@ -65,7 +65,7 @@ if not PerfFrameDB.fontSize then
     PerfFrameDB.textScale = nil
 end
 
--- Drop legacy fontScale (fontSize is now the single source of truth)
+-- Drop legacy fontScale
 if PerfFrameDB.fontScale ~= nil then
     PerfFrameDB.fontScale = nil
 end
@@ -81,8 +81,8 @@ if not PerfFrameDB.combatMode then PerfFrameDB.combatMode = "ALWAYS" end
 if PerfFrameDB.showTooltip == nil then PerfFrameDB.showTooltip = true end
 if PerfFrameDB.hideUntilHover == nil then PerfFrameDB.hideUntilHover = false end
 if PerfFrameDB.showAddonMemory == nil then PerfFrameDB.showAddonMemory = false end
--- AddOn Memory list mode (defaults to Top 5 for first-time installs).
--- Also guard against unexpected/invalid values (e.g. ""), which would otherwise fall back to Top 10.
+
+-- AddOn Memory list mode (defaults to Top 5).
 do
     local m = PerfFrameDB.addonMemoryListMode
     if m ~= "TOP5" and m ~= "TOP10" and m ~= "TOP20" and m ~= "ALL" then
@@ -114,10 +114,10 @@ end
 
 if PerfFrameDB.showFPS == nil then PerfFrameDB.showFPS = true end
 if PerfFrameDB.showMS == nil then PerfFrameDB.showMS = true end
+
 -- Create main frame
 PerfFrame = CreateFrame("Frame", "PerfFrame", UIParent)
 PerfFrame:EnableMouse(true)
-
 
 -- =========================================
 -- Visibility / Enable state helpers
@@ -194,10 +194,8 @@ end
 -- Movable configuration
 local movable = true
 local frame_anchor = "TOP" -- Not currently used for dynamic positioning
+
 -- Visibility and display state
---local showTooltip = PerfFrameDB.showTooltip
-
-
 local function GetShowMode()
     if PerfFrameDB.showFPS and PerfFrameDB.showMS then
         return "both"
@@ -295,7 +293,6 @@ if movable then
     PerfFrame:SetMovable(true)
 
     -- Position is applied later (ADDON_LOADED/PLAYER_LOGIN) to survive disable/enable
-
     PerfFrame:SetScript("OnMouseDown", function(self)
         if IsAltKeyDown() then self:StartMoving() end
     end)
@@ -331,7 +328,6 @@ PFPos:SetScript("OnEvent", function(self, event, arg1)
         return
     end
 
-
     -- If custom position was just enabled but no custom pos exists yet, initialize from global
     if PerfFrameCharDB and PerfFrameCharDB.useCustomPosition and not PerfFrameCharDB.framePos then
         local g = PerfFrameDB.framePos
@@ -347,7 +343,6 @@ PFPos:SetScript("OnEvent", function(self, event, arg1)
     end
 
     PerfFrame_ApplySavedPosition()
-
 
 -- Combat visibility handler (Always/Only in combat/Hide in combat)
 local PFVis = CreateFrame("Frame")
@@ -428,21 +423,18 @@ CF:SetScript("OnEvent", function(self, event)
 
     -- Basic font setup
     local FONT = STANDARD_TEXT_FONT
-    local addonList = 50
     local font = FONT
     local fontFlag = "THINOUTLINE"
     local textAlign = "CENTER"
-    local customColor = true
     local useShadow = false
     local fontSize = (PerfFrameDB.fontSize or 12)
 
     -- Determine colors
     local classColor
-    if not customColor then
-        classColor = { r = 1, g = 1, b = 1 }
-    else
+    do
         local _, class = UnitClass("player")
-        classColor = (CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS)[class]
+        local t = (CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS)
+        classColor = (t and t[class]) or { r = 1, g = 1, b = 1 }
     end
 
     local function ColorCodeFromRGB(r, g, b)
@@ -456,8 +448,6 @@ CF:SetScript("OnEvent", function(self, event)
     local function GetTextColorTables()
         local mode = PerfFrameDB.textColorMode or "CLASS"
 
-	        -- The user's request is to color the *labels* ("fps" / "ms"), not the values.
-	        -- Keep the base string color white, and apply color codes only to the labels.
 	        if mode == "CUSTOM_BOTH" then
 	            local c = PerfFrameDB.customTextColor or classColor
 	            return { r = 1, g = 1, b = 1 }, c, c -- base white, fps label, ms label
@@ -470,8 +460,6 @@ CF:SetScript("OnEvent", function(self, event)
 	        end
     end
 
-    -- Tooltip header color stays class-based for consistency
-    local color = classColor
     -- Memory usage color and formatting helpers
     local function HeatColor(pct)
         if pct < 0 then pct = 0 end
@@ -495,7 +483,6 @@ CF:SetScript("OnEvent", function(self, event)
 
     
     local function MemoryColor(kb, maxKB)
-        -- Hybrid scaling:
         -- If the largest addon is 20 MB or more, use absolute thresholds for readability.
         -- Otherwise, use a relative gradient so small addon setups still show contrast.
         if maxKB and maxKB >= (20 * 1024) then
@@ -589,7 +576,7 @@ CF:SetScript("OnEvent", function(self, event)
 
                         UpdateAddOnMemoryUsage()
                         GameTooltip:AddLine(" ")
-                        GameTooltip:AddLine("AddOn Memory", color.r, color.g, color.b)
+                        GameTooltip:AddLine("AddOn Memory", classColor.r, classColor.g, classColor.b)
 
                         for i = 1, safe_GetNumAddOns() do
                             local kb = safe_GetAddOnMemoryUsage(i)
