@@ -25,8 +25,8 @@ Hold ALT + left-click and drag. It's that simple!
 PerfFrame includes a highly-customizable text-scale and opacity options to improve visibility on any display.
 
 ### Manual Installation
-* Extract the PerfFrame folder into the correct client folder (for example):
-  `World of Warcraft/_retail_/Interface/AddOns/`
+* Extract the PerfFrame folder into the correct client folder (for example):  
+`World of Warcraft/_retail_/Interface/AddOns/`
 * Enable PerfFrame in the AddOns menu if it isn't already.
 * Type `/pf help` in-game for a list of available commands.
 
