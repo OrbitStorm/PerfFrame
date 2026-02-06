@@ -180,6 +180,17 @@ function PerfFrameTemplates.CreatePFPopout(parent, entries, callback)
     frame.Add = AddPopoutEntry
     frame.Select = SetSelectedEntry
 
+
+    function frame:SetSelectedValue(val)
+        if val == nil then return end
+        for idx, entry in ipairs(self.entries) do
+            if entry.value == val then
+                self:Select(idx)
+                return
+            end
+        end
+    end
+
     if entries then
         local selectedIndex = 1
         for idx, entry in ipairs(entries) do

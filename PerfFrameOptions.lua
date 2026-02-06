@@ -1,7 +1,7 @@
 -- =========================================
 -- PerfFrame Options Panel
 -- =========================================
-local addonVersion = "v2.2"
+local addonVersion = "v2.3.0"
 
 -- -------------------------------------------------
 -- Helpers
@@ -61,9 +61,8 @@ local function ApplyFontScale(scale)
     scale = tonumber(scale) or 1
     if scale < 0.5 then scale = 0.5 end
     if scale > 2 then scale = 2 end
-    PerfFrameDB.fontScale = scale
-    -- Keep fontSize in sync for backwards compatibility
     PerfFrameDB.fontSize = math.floor((12 * scale) + 0.5)
+    PerfFrameDB.fontScale = nil
 
     if PerfFrame and PerfFrame.text and PerfFrame.text.GetFont then
         local font, _, flags = PerfFrame.text:GetFont()
@@ -73,11 +72,9 @@ local function ApplyFontScale(scale)
 end
 
 local function GetFontScale()
-    if PerfFrameDB.fontScale then return PerfFrameDB.fontScale end
     if PerfFrameDB.fontSize then return (PerfFrameDB.fontSize / 12) end
     return 1
 end
-
 
 local function ApplyBackgroundOpacity(value)
     value = tonumber(value) or 0
@@ -111,10 +108,107 @@ local function SkinMinimalCheckbox(cb)
     if not cb:GetCheckedTexture() then
         cb:SetCheckedTexture("Interface\\Buttons\\UI-CheckBox-Check")
     end
+
     local checked = cb:GetCheckedTexture()
     if checked and checked.SetAtlas then
         checked:SetAtlas("checkbox-minimal-checkmark", true)
     end
+
+end
+
+
+local function CreateColorSwatchButton(parentRow, getColorFunc, setColorFunc)
+    local btn = CreateFrame("Button", nil, parentRow)
+    btn:SetSize(22, 22)
+    btn:SetPoint("LEFT", 230, 0)
+
+    -- True-color fill with a subtle border (no dark overlay on the fill)
+    btn.outline = btn:CreateTexture(nil, "BORDER")
+    btn.outline:SetAllPoints()
+    btn.outline:SetColorTexture(0, 0, 0, 0.9)
+
+    btn.fill = btn:CreateTexture(nil, "ARTWORK")
+    btn.fill:SetPoint("TOPLEFT", 1, -1)
+    btn.fill:SetPoint("BOTTOMRIGHT", -1, 1)
+    btn.fill:SetColorTexture(1, 1, 1, 1)
+
+    local function Clamp01(x)
+        x = tonumber(x) or 0
+        if x < 0 then return 0 end
+        if x > 1 then return 1 end
+        return x
+    end
+
+    local function UpdateSwatch()
+        local c = getColorFunc()
+        if type(c) == "table" then
+            local r, g, b = Clamp01(c.r), Clamp01(c.g), Clamp01(c.b)
+            btn.fill:SetColorTexture(r, g, b, 1)
+        end
+    end
+
+    local function OpenPicker()
+        -- Ensure the Blizzard color picker UI is available
+        if not ColorPickerFrame then
+            if C_AddOns and C_AddOns.LoadAddOn then
+                pcall(C_AddOns.LoadAddOn, "Blizzard_ColorPicker")
+            else
+                pcall(LoadAddOn, "Blizzard_ColorPicker")
+            end
+        end
+        if not ColorPickerFrame then return end
+
+        local c = getColorFunc()
+        local r, g, b = 1, 1, 1
+        if type(c) == "table" then
+            r, g, b = Clamp01(c.r), Clamp01(c.g), Clamp01(c.b)
+        end
+
+        local prev = { r = r, g = g, b = b }
+
+        local function ApplyColor(nr, ng, nb)
+            setColorFunc(Clamp01(nr), Clamp01(ng), Clamp01(nb))
+            UpdateSwatch()
+            if PerfFrame_UpdateTextColor then
+                PerfFrame_UpdateTextColor()
+            elseif PerfFrame_UpdateText then
+                PerfFrame_UpdateText()
+            end
+        end
+
+        if ColorPickerFrame.SetupColorPickerAndShow then
+            local info = {
+                r = r, g = g, b = b,
+                hasOpacity = false,
+                swatchFunc = function()
+                    local nr, ng, nb = ColorPickerFrame:GetColorRGB()
+                    ApplyColor(nr, ng, nb)
+                end,
+                cancelFunc = function()
+                    ApplyColor(prev.r, prev.g, prev.b)
+                end,
+            }
+            ColorPickerFrame:SetupColorPickerAndShow(info)
+        else
+            ColorPickerFrame.func = function()
+                local nr, ng, nb = ColorPickerFrame:GetColorRGB()
+                ApplyColor(nr, ng, nb)
+            end
+            ColorPickerFrame.cancelFunc = function()
+                ApplyColor(prev.r, prev.g, prev.b)
+            end
+            if ColorPickerFrame.SetColorRGB then
+                ColorPickerFrame:SetColorRGB(r, g, b)
+            end
+            ColorPickerFrame:Show()
+        end
+    end
+
+    btn:SetScript("OnClick", OpenPicker)
+    btn.UpdateSwatch = UpdateSwatch
+    UpdateSwatch()
+
+    return btn
 end
 
 -- -------------------------------------------------
@@ -156,14 +250,23 @@ Home:SetScript("OnShow", function(self)
             local v = PerfFrameDB.combatMode or "ALWAYS"
             self._combatPopout:SetSelectedValue(v)
         end
-        if self._extraInfoPopout then
-            local showClock = PerfFrameDB.showClock and true or false
-            local showMail  = PerfFrameDB.showMail and true or false
-            local v = (showClock and showMail) and "ALL" or (showClock and "CLOCK") or (showMail and "MAIL") or "OFF"
-            self._extraInfoPopout:SetSelectedValue(v)
+        if self._hideUntilHoverCB then
+            self._hideUntilHoverCB:SetChecked(PerfFrameDB.hideUntilHover and true or false)
         end
-        if self._addonMemCB then
-            self._addonMemCB:SetChecked(PerfFrameDB.showAddonMemory and true or false)
+		if self._addonMemCB then
+			self._addonMemCB:SetChecked(PerfFrameDB.showAddonMemory and true or false)
+		end
+		if self._addonMemListPopout then
+			local v = PerfFrameDB.addonMemoryListMode or "TOP5"
+			self._addonMemListPopout:SetSelectedValue(v)
+		end
+
+        if self._textColorModePopout then
+            local v = PerfFrameDB.textColorMode or "CLASS"
+            self._textColorModePopout:SetSelectedValue(v)
+        end
+        if self._UpdateTextColorControls then
+            self:_UpdateTextColorControls()
         end
         if self._useCustomCB then
             PerfFrameCharDB = PerfFrameCharDB or {}
@@ -218,7 +321,7 @@ Home:SetScript("OnShow", function(self)
         self._headerMask = mask
 
         local logo = boundingBox:CreateTexture(nil, "ARTWORK")
-        logo:SetTexture("Interface\\AddOns\\PerfFrame\\icon-nobg.tga", "CLAMP", "CLAMP", "TRILINEAR")
+        logo:SetTexture("Interface\\AddOns\\PerfFrame\\icon64.tga", "CLAMP", "CLAMP", "TRILINEAR")
         -- keep the logo inside banner bounds
         logo:SetPoint("TOPRIGHT", -12, -4)
         logo:SetSize(54, 54)
@@ -226,9 +329,11 @@ Home:SetScript("OnShow", function(self)
             logo:AddMaskTexture(mask)
         end
 
-        local title = boundingBox:CreateFontString(nil, "ARTWORK", "Game36Font_Shadow2")
+        local titleTemplate = _G["Game36Font_Shadow2"] and "Game36Font_Shadow2" or "GameFontNormalLarge"
+        local title = boundingBox:CreateFontString(nil, "ARTWORK", titleTemplate)
         title:SetTextColor(GameFontNormal:GetTextColor())
-        title:SetText("PerfFrame")
+        local PF_BRAND_TITLE = "|cffF59A23Perf|cff3FC7FFFrame|r"
+        title:SetText(PF_BRAND_TITLE)
         title:SetPoint("BOTTOMLEFT", 29, 16)
 
         local version = boundingBox:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -407,67 +512,9 @@ function frameInfoPopout:SetSelectedValue(val)
 end
 
 -- -----------------------------------------
--- 3) Frame Extra Info
--- -----------------------------------------
-local extraInfoRow = CreateRow(configurationFrame, frameInfoRow, "Frame Extra Info")
-
-local function GetExtraInfoValue()
-    local showClock = PerfFrameDB.showClock and true or false
-    local showMail  = PerfFrameDB.showMail and true or false
-    if showClock and showMail then return "ALL" end
-    if showMail then return "MAIL" end
-    if showClock then return "CLOCK" end
-    return "OFF"
-end
-
-local extraInfoPopout
-extraInfoPopout = PerfFrameTemplates.CreatePFPopout(
-    extraInfoRow,
-    {
-        { label = "OFF",        value = "OFF",   selected = GetExtraInfoValue() == "OFF" },
-        { label = "Show All",   value = "ALL",   selected = GetExtraInfoValue() == "ALL" },
-        { label = "Show Mail",  value = "MAIL",  selected = GetExtraInfoValue() == "MAIL" },
-        { label = "Show Clock", value = "CLOCK", selected = GetExtraInfoValue() == "CLOCK" },
-    },
-    function()
-        local v = extraInfoPopout.selected.value
-        if v == "OFF" then
-            PerfFrameDB.showClock = false
-            PerfFrameDB.showMail  = false
-        elseif v == "MAIL" then
-            PerfFrameDB.showClock = false
-            PerfFrameDB.showMail  = true
-        elseif v == "CLOCK" then
-            PerfFrameDB.showClock = true
-            PerfFrameDB.showMail  = false
-        else
-            PerfFrameDB.showClock = true
-            PerfFrameDB.showMail  = true
-        end
-        RefreshPerfFrameText()
-    end
-)
-extraInfoPopout:SetPoint("LEFT", 230, 0)
-if extraInfoPopout.Popout and extraInfoPopout.Popout.Layout then extraInfoPopout.Popout:Layout() end
-self._extraInfoPopout = extraInfoPopout
-AttachTooltip({
-    "Frame Extra Info",
-    "Controls the clock and mail indicators displayed next to the FPS/MS text.",
-}, extraInfoRow.Label)
-
-function extraInfoPopout:SetSelectedValue(val)
-    for idx, e in ipairs(self.entries or {}) do
-        if e.value == val then
-            self:Select(idx)
-            break
-        end
-    end
-end
-
--- -----------------------------------------
 -- 4) Combat Toggle
 -- -----------------------------------------
-local combatRow = CreateRow(configurationFrame, extraInfoRow, "Combat Toggle")
+local combatRow = CreateRow(configurationFrame, frameInfoRow, "Combat Toggle")
 
 local function GetCombatModeValue()
     return PerfFrameDB.combatMode or "ALWAYS"
@@ -509,9 +556,28 @@ function combatPopout:SetSelectedValue(val)
 end
 
 -- -----------------------------------------
--- 5) Show Addon Memory
+-- 5) Hide Until Mouseover
 -- -----------------------------------------
-local addonMemRow = CreateRow(configurationFrame, combatRow, "Show Addon Memory")
+local hoverRow = CreateRow(configurationFrame, combatRow, "Hide Until Mouseover")
+local hoverCB = CreateFrame("CheckButton", nil, hoverRow, "UICheckButtonTemplate")
+hoverCB:SetSize(30, 29)
+hoverCB:SetPoint("LEFT", 230, 0)
+SkinMinimalCheckbox(hoverCB)
+hoverCB:SetScript("OnClick", function(btn)
+    PerfFrameDB.hideUntilHover = btn:GetChecked() and true or false
+    if setupTooltip then setupTooltip() end
+end)
+hoverCB:SetChecked(PerfFrameDB.hideUntilHover and true or false)
+self._hideUntilHoverCB = hoverCB
+AttachTooltip({
+    "Hide Until Mouseover",
+    "When enabled, the frame is hidden until you hover your mouse over it.",
+}, hoverRow.Label)
+
+-- -----------------------------------------
+-- 6) Show Addon Memory
+-- -----------------------------------------
+local addonMemRow = CreateRow(configurationFrame, hoverRow, "Show Addon Memory")
 local addonMemCB = CreateFrame("CheckButton", nil, addonMemRow, "UICheckButtonTemplate")
 addonMemCB:SetSize(30, 29)
 addonMemCB:SetPoint("LEFT", 230, 0)
@@ -528,55 +594,45 @@ AttachTooltip({
 }, addonMemRow.Label)
 
 -- -----------------------------------------
--- 6) Use Custom Frame Position
--- (active mode, this character)
+-- 6b) AddOn Memory List
 -- -----------------------------------------
-local customPosRow = CreateRow(configurationFrame, addonMemRow, "Use Custom Frame Position")
-local useCustomCB = CreateFrame("CheckButton", nil, customPosRow, "UICheckButtonTemplate")
-useCustomCB:SetSize(30, 29)
-useCustomCB:SetPoint("LEFT", 230, 0)
-SkinMinimalCheckbox(useCustomCB)
-useCustomCB:SetScript("OnClick", function(btn)
-    PerfFrameCharDB = PerfFrameCharDB or {}
-    local checked = btn:GetChecked() and true or false
-    PerfFrameCharDB.useCustomPosition = checked
+local addonMemListRow = CreateRow(configurationFrame, addonMemRow, "AddOn Memory List")
 
-    if checked then
-        local modeKey = (PerfFrame_GetModeKey and PerfFrame_GetModeKey()) or "ALL"
-        PerfFrameCharDB.framePosByMode = PerfFrameCharDB.framePosByMode or {}
+local function GetAddonMemListValue()
+    local v = PerfFrameDB.addonMemoryListMode or "TOP5"
+    if v == "TOP5" or v == "TOP10" or v == "TOP20" or v == "ALL" then return v end
+    return "TOP5"
+end
 
-        if not PerfFrameCharDB.framePosByMode[modeKey] then
-            PerfFrameDB.framePos = PerfFrameDB.framePos or { point="CENTER", relativeTo="UIParent", relativePoint="CENTER", x=0, y=0 }
-            local src = PerfFrameDB.framePos
-            PerfFrameCharDB.framePosByMode[modeKey] = {
-                point = src.point,
-                relativeTo = src.relativeTo,
-                relativePoint = src.relativePoint,
-                x = src.x,
-                y = src.y,
-            }
-        end
-
-        -- Legacy field
-        PerfFrameCharDB.framePos = PerfFrameCharDB.framePosByMode[modeKey]
+local addonMemListPopout
+addonMemListPopout = PerfFrameTemplates.CreatePFPopout(
+    addonMemListRow,
+    {
+        { label = "Top 5",  value = "TOP5",  selected = GetAddonMemListValue() == "TOP5" },
+        { label = "Top 10", value = "TOP10", selected = GetAddonMemListValue() == "TOP10" },
+        { label = "Top 20", value = "TOP20", selected = GetAddonMemListValue() == "TOP20" },
+        { label = "All",    value = "ALL",   selected = GetAddonMemListValue() == "ALL" },
+    },
+    function()
+        local v = addonMemListPopout.selected.value
+        PerfFrameDB.addonMemoryListMode = v
+        if PerfFrame_RefreshDisplay then PerfFrame_RefreshDisplay() end
     end
-
-    if PerfFrame_ApplySavedPosition then
-        PerfFrame_ApplySavedPosition()
-    end
-end)
-PerfFrameCharDB = PerfFrameCharDB or {}
-useCustomCB:SetChecked(PerfFrameCharDB.useCustomPosition and true or false)
-self._useCustomCB = useCustomCB
+)
+addonMemListPopout:SetPoint("LEFT", 230, 0)
+if addonMemListPopout.Popout and addonMemListPopout.Popout.Layout then addonMemListPopout.Popout:Layout() end
+self._addonMemListPopout = addonMemListPopout
 AttachTooltip({
-    "Use Custom Frame Position",
-    "When enabled, the frame position becomes specific to this character.",
-}, customPosRow.Label)
+    "AddOn Memory List",
+    "Choose how many entries are shown in the AddOn memory tooltip list.",
+    "If your installed AddOn count is below the selected limit, all entries will be shown.",
+    "Hold Shift while hovering to show all entries.",
+}, addonMemListRow.Label)
 
 -- -----------------------------------------
--- 7) Font Scale
+-- 8) Font Scale
 -- -----------------------------------------
-local fontScaleRow = CreateRow(configurationFrame, customPosRow, "Font Scale")
+local fontScaleRow = CreateRow(configurationFrame, addonMemListRow, "Font Scale")
 local fontScaleSlider = CreateFrame("Frame", nil, fontScaleRow, "MinimalSliderWithSteppersTemplate")
 fontScaleSlider:Init(GetFontScale(), 0.5, 2, 100)
 fontScaleSlider:SetPoint("LEFT", 230, 0)
@@ -621,7 +677,7 @@ end
 
 local function PerfFrame_FontScale_OnValueChanged(_, value)
     ApplyFontScale(value)
-    fontValue:SetText(tostring(PerfFrameDB.fontSize or math.floor((12 * (PerfFrameDB.fontScale or 1)) + 0.5)))
+    fontValue:SetText(tostring(PerfFrameDB.fontSize or math.floor((12 * GetFontScale()) + 0.5)))
 end
 fontScaleSlider.Slider:SetScript("OnValueChanged", PerfFrame_FontScale_OnValueChanged)
 self._fontScaleOnValueChanged = PerfFrame_FontScale_OnValueChanged
@@ -632,10 +688,12 @@ AttachTooltip({
     "Adjust the size of the text in the frame.",
 }, fontScaleRow.Label)
 
+
 -- -----------------------------------------
--- 8) Background Opacity
+-- 9) Background Opacity
 -- -----------------------------------------
 local bgOpacityRow = CreateRow(configurationFrame, fontScaleRow, "Background Opacity")
+self._bgOpacityRow = bgOpacityRow
 local bgOpacitySlider = CreateFrame("Frame", nil, bgOpacityRow, "MinimalSliderWithSteppersTemplate")
 bgOpacitySlider:Init(GetBackgroundOpacity(), 0, 100, 100)
 bgOpacitySlider:SetPoint("LEFT", 230, 0)
@@ -694,9 +752,191 @@ AttachTooltip({
 }, bgOpacityRow.Label)
 
 -- -----------------------------------------
--- 9) Reset Frame Position
 -- -----------------------------------------
-local resetRow = CreateRow(configurationFrame, bgOpacityRow, "Reset Position")
+-- 8b) Text Colors
+-- -----------------------------------------
+local textColorsRow = CreateRow(configurationFrame, bgOpacityRow, "Text Colors")
+
+local function GetTextColorModeValue()
+    local v = PerfFrameDB.textColorMode or "CLASS"
+    if v == "CLASS" or v == "CUSTOM_BOTH" or v == "CUSTOM_SPLIT" then return v end
+    return "CLASS"
+end
+
+local textColorModePopout
+textColorModePopout = PerfFrameTemplates.CreatePFPopout(
+    textColorsRow,
+    {
+        { label = "Class Colors", value = "CLASS", selected = GetTextColorModeValue() == "CLASS" },
+        { label = "Custom: One Color", value = "CUSTOM_BOTH", selected = GetTextColorModeValue() == "CUSTOM_BOTH" },
+        { label = "Custom: Separate (FPS/MS)", value = "CUSTOM_SPLIT", selected = GetTextColorModeValue() == "CUSTOM_SPLIT" },
+    },
+    function()
+        local v = textColorModePopout.selected and textColorModePopout.selected.value or "CLASS"
+        PerfFrameDB.textColorMode = v
+        if PerfFrame_RefreshDisplay then PerfFrame_RefreshDisplay() end
+        if Home and Home._UpdateTextColorControls then Home:_UpdateTextColorControls() end
+    end
+)
+textColorModePopout:SetPoint("LEFT", 230, 0)
+self._textColorModePopout = textColorModePopout
+
+AttachTooltip({
+    "Text Colors",
+    "Choose how FPS/MS text is colored.",
+    "Class Colors uses your class color (default).",
+}, textColorsRow.Label)
+
+-- Custom: One Color
+local oneColorRow = CreateRow(configurationFrame, textColorsRow, "Text Color")
+local oneColorBtn = CreateColorSwatchButton(
+    oneColorRow,
+    function() return PerfFrameDB.customTextColor end,
+    function(r, g, b)
+        PerfFrameDB.customTextColor = { r = r, g = g, b = b }
+    end
+)
+self._oneColorBtn = oneColorBtn
+self._oneColorRow = oneColorRow
+AttachTooltip({
+    "Text Color",
+    "Used when Text Colors is set to Custom: One Color.",
+}, oneColorRow.Label)
+
+-- Custom: Separate Colors
+local fpsColorRow = CreateRow(configurationFrame, oneColorRow, "FPS Color")
+local fpsColorBtn = CreateColorSwatchButton(
+    fpsColorRow,
+    function() return PerfFrameDB.customFPSColor end,
+    function(r, g, b)
+        PerfFrameDB.customFPSColor = { r = r, g = g, b = b }
+    end
+)
+self._fpsColorBtn = fpsColorBtn
+self._fpsColorRow = fpsColorRow
+AttachTooltip({
+    "FPS Color",
+    "Used when Text Colors is set to Custom: Separate (FPS/MS).",
+}, fpsColorRow.Label)
+
+local msColorRow = CreateRow(configurationFrame, fpsColorRow, "MS Color")
+local msColorBtn = CreateColorSwatchButton(
+    msColorRow,
+    function() return PerfFrameDB.customMSColor end,
+    function(r, g, b)
+        PerfFrameDB.customMSColor = { r = r, g = g, b = b }
+    end
+)
+self._msColorBtn = msColorBtn
+self._msColorRow = msColorRow
+AttachTooltip({
+    "MS Color",
+    "Used when Text Colors is set to Custom: Separate (FPS/MS).",
+}, msColorRow.Label)
+
+-- Small helper to enable/disable the relevant swatches without reflowing layout
+function Home:_UpdateTextColorControls()
+    local mode = GetTextColorModeValue()
+
+    -- Show/hide rows based on selection
+    if self._oneColorRow then self._oneColorRow:SetShown(mode == "CUSTOM_BOTH") end
+    if self._fpsColorRow then self._fpsColorRow:SetShown(mode == "CUSTOM_SPLIT") end
+    if self._msColorRow then self._msColorRow:SetShown(mode == "CUSTOM_SPLIT") end
+
+    -- Re-anchor the optional rows so spacing stays correct (prevents overlap/smushing)
+    if self._oneColorRow then
+        self._oneColorRow:ClearAllPoints()
+        self._oneColorRow:SetPoint("TOPLEFT", textColorsRow, "BOTTOMLEFT", 0, -8)
+        self._oneColorRow:SetPoint("RIGHT")
+    end
+    if self._fpsColorRow then
+        self._fpsColorRow:ClearAllPoints()
+        self._fpsColorRow:SetPoint("TOPLEFT", textColorsRow, "BOTTOMLEFT", 0, -8)
+        self._fpsColorRow:SetPoint("RIGHT")
+    end
+    if self._msColorRow then
+        self._msColorRow:ClearAllPoints()
+        self._msColorRow:SetPoint("TOPLEFT", self._fpsColorRow, "BOTTOMLEFT", 0, -8)
+        self._msColorRow:SetPoint("RIGHT")
+    end
+
+    -- Re-anchor rows that follow Text Colors to the last visible row in the Text Colors block
+    local lastRow = textColorsRow
+    if mode == "CUSTOM_BOTH" and self._oneColorRow then
+        lastRow = self._oneColorRow
+    elseif mode == "CUSTOM_SPLIT" and self._msColorRow then
+        lastRow = self._msColorRow
+    end
+
+    if self._customPosRow then
+        self._customPosRow:ClearAllPoints()
+        self._customPosRow:SetPoint("TOPLEFT", lastRow, "BOTTOMLEFT", 0, -8)
+        self._customPosRow:SetPoint("RIGHT")
+    end
+
+    -- Enable/disable the relevant swatches
+    local function SetBtnEnabled(btn, enabled)
+        if not btn then return end
+        if enabled then btn:Enable() else btn:Disable() end
+        local a = enabled and 1 or 0.35
+        btn:SetAlpha(a)
+    end
+
+    SetBtnEnabled(self._oneColorBtn, mode == "CUSTOM_BOTH")
+    SetBtnEnabled(self._fpsColorBtn, mode == "CUSTOM_SPLIT")
+    SetBtnEnabled(self._msColorBtn, mode == "CUSTOM_SPLIT")
+
+    if self._oneColorBtn and self._oneColorBtn.UpdateSwatch then self._oneColorBtn:UpdateSwatch() end
+    if self._fpsColorBtn and self._fpsColorBtn.UpdateSwatch then self._fpsColorBtn:UpdateSwatch() end
+    if self._msColorBtn and self._msColorBtn.UpdateSwatch then self._msColorBtn:UpdateSwatch() end
+end
+
+local customPosRow = CreateRow(configurationFrame, textColorsRow, "Use Custom Frame Position")
+self._customPosRow = customPosRow
+local useCustomCB = CreateFrame("CheckButton", nil, customPosRow, "UICheckButtonTemplate")
+useCustomCB:SetSize(30, 29)
+useCustomCB:SetPoint("LEFT", 230, 0)
+SkinMinimalCheckbox(useCustomCB)
+useCustomCB:SetScript("OnClick", function(btn)
+    PerfFrameCharDB = PerfFrameCharDB or {}
+    local checked = btn:GetChecked() and true or false
+    PerfFrameCharDB.useCustomPosition = checked
+
+    if checked then
+        local modeKey = (PerfFrame_GetModeKey and PerfFrame_GetModeKey()) or "ALL"
+        PerfFrameCharDB.framePosByMode = PerfFrameCharDB.framePosByMode or {}
+
+        if not PerfFrameCharDB.framePosByMode[modeKey] then
+            PerfFrameDB.framePos = PerfFrameDB.framePos or { point="CENTER", relativeTo="UIParent", relativePoint="CENTER", x=0, y=0 }
+            local src = PerfFrameDB.framePos
+            PerfFrameCharDB.framePosByMode[modeKey] = {
+                point = src.point,
+                relativeTo = src.relativeTo,
+                relativePoint = src.relativePoint,
+                x = src.x,
+                y = src.y,
+            }
+        end
+
+        -- Legacy field
+        PerfFrameCharDB.framePos = PerfFrameCharDB.framePosByMode[modeKey]
+    end
+
+    if PerfFrame_ApplySavedPosition then
+        PerfFrame_ApplySavedPosition()
+    end
+end)
+PerfFrameCharDB = PerfFrameCharDB or {}
+useCustomCB:SetChecked(PerfFrameCharDB.useCustomPosition and true or false)
+self._useCustomCB = useCustomCB
+AttachTooltip({
+    "Use Custom Frame Position",
+    "When enabled, the frame position becomes specific to this character.",
+}, customPosRow.Label)
+
+-- 10) Reset Frame Position
+-- -----------------------------------------
+local resetRow = CreateRow(configurationFrame, customPosRow, "Reset Position")
 resetRow:SetHeight(resetRow:GetHeight() + 10) -- add a buffer to avoid encroaching on the slider
 local resetBtn = CreateFrame("Button", nil, resetRow, "UIPanelButtonTemplate")
 resetBtn:SetPoint("LEFT", 230, 0)
@@ -743,6 +983,11 @@ AttachTooltip({
     "Resets the frame position to the default center point.",
 }, resetRow.Label)
 
+
+    -- Ensure Text Colors conditional rows are laid out correctly on first open/reload
+    if self._UpdateTextColorControls then
+        self:_UpdateTextColorControls()
+    end
 -- -----------------------------------------
 -- Credits
 -- -----------------------------------------
@@ -764,7 +1009,7 @@ creditsText:SetPoint("TOPLEFT", 16, -8)
 creditsText:SetPoint("RIGHT", -16, 0)
 creditsText:SetText(
     "|cFFFFFFFFPerfFrame|r is a small, customizable and movable frame for FPS, latency, and more.\n\n" ..
-    "Created by |cFFFFFFFFSawfty|r. Inspired by Pytilix's FPS-MS-Tracker.\n\n" ..
+    "Created by |cFFFFFFFFSawfty|r. Inspired by FPS-MS-Tracker.\n\n" ..
     "Thanks to TomCat for UI inspiration."
 )
 

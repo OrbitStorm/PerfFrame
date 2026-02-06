@@ -1,9 +1,9 @@
 ## Interface: 120000
 ## Title: PerfFrame
-## Version: v2.2
+## Version: v2.3.0
 ## Author: Sawfty
 ## Notes: Lightweight performance frame (FPS, latency, clock, mail, tooltip) for World of Warcraft.
-## Inspired by Pytilix's FPS-MS-Tracker
+## Inspired by FPS-MS-Tracker
 ## DefaultState: Enabled
 ## SavedVariables: PerfFrameDB
 ## SavedVariablesPerCharacter: PerfFrameCharDB

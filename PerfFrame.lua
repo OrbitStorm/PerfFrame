@@ -1,17 +1,12 @@
 -- =========================================
--- PerfFrame v2.2
--- created by Sawfty
--- inspired by Pytilix's FPS-MS-Tracker
+-- PerfFrame v2.3.0
 -- =========================================
 
 -- Initialize SavedVariables
+if type(PerfFrameDB) ~= "table" then PerfFrameDB = nil end
 PerfFrameDB = PerfFrameDB or {
     showTooltip = true,
     fontSize = 12,
-    fontScale = 1,
-    showClock = false,
-    clockFormat = "12h",
-    showMail = false,
     hideUntilHover = false,
     disabled = false,
     backgroundOpacity = 0,
@@ -19,14 +14,33 @@ PerfFrameDB = PerfFrameDB or {
     showAddonMemory = false,
 	showFPS = true,
     showMS = true,
+
+    addonMemoryListMode = "TOP5",
+
+    textColorMode = "CLASS", -- "CLASS" | "CUSTOM_BOTH" | "CUSTOM_SPLIT"
+    customTextColor = { r = 1, g = 1, b = 1 },
+    customFPSColor  = { r = 1, g = 1, b = 1 },
+    customMSColor   = { r = 1, g = 1, b = 1 },
+
     framePos = { point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", x = 0, y = 0 }
 }
 
 -- Initialize per-character SavedVariables (position override)
+if type(PerfFrameCharDB) ~= "table" then PerfFrameCharDB = nil end
 PerfFrameCharDB = PerfFrameCharDB or {
     useCustomPosition = false,
     framePos = nil
 }
+
+-- Ensure per-character defaults
+if PerfFrameCharDB.useCustomPosition == nil then PerfFrameCharDB.useCustomPosition = false end
+if PerfFrameCharDB.framePos ~= nil and type(PerfFrameCharDB.framePos) ~= "table" then PerfFrameCharDB.framePos = nil end
+
+
+-- Ensure framePos exists (older DB migrations)
+if type(PerfFrameDB.framePos) ~= "table" then
+    PerfFrameDB.framePos = { point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", x = 0, y = 0 }
+end
 
 -- Ensure v1.0 users have a valid position structure
 if not PerfFrameDB.framePos.relativePoint then
@@ -47,18 +61,59 @@ if not PerfFrameDB.fontSize then
     else
         PerfFrameDB.fontSize = 12
     end
+    -- Remove legacy key once migrated
+    PerfFrameDB.textScale = nil
 end
 
--- Ensure clockFormat defaults to 12h if nil
-if not PerfFrameDB.clockFormat then
-    PerfFrameDB.clockFormat = "12h"
+-- Drop legacy fontScale (fontSize is now the single source of truth)
+if PerfFrameDB.fontScale ~= nil then
+    PerfFrameDB.fontScale = nil
 end
+
 
 -- Ensure new defaults
 if PerfFrameDB.disabled == nil then PerfFrameDB.disabled = false end
 if PerfFrameDB.backgroundOpacity == nil then PerfFrameDB.backgroundOpacity = 0 end
 if not PerfFrameDB.combatMode then PerfFrameDB.combatMode = "ALWAYS" end
 
+
+-- Ensure missing defaults from older versions
+if PerfFrameDB.showTooltip == nil then PerfFrameDB.showTooltip = true end
+if PerfFrameDB.hideUntilHover == nil then PerfFrameDB.hideUntilHover = false end
+if PerfFrameDB.showAddonMemory == nil then PerfFrameDB.showAddonMemory = false end
+-- AddOn Memory list mode (defaults to Top 5 for first-time installs).
+-- Also guard against unexpected/invalid values (e.g. ""), which would otherwise fall back to Top 10.
+do
+    local m = PerfFrameDB.addonMemoryListMode
+    if m ~= "TOP5" and m ~= "TOP10" and m ~= "TOP20" and m ~= "ALL" then
+        PerfFrameDB.addonMemoryListMode = "TOP5"
+    end
+end
+
+-- Text color defaults / upgrade guards
+do
+    local m = PerfFrameDB.textColorMode
+    if m ~= "CLASS" and m ~= "CUSTOM_BOTH" and m ~= "CUSTOM_SPLIT" then
+        PerfFrameDB.textColorMode = "CLASS"
+    end
+
+    local function normalizeColor(t)
+        if type(t) ~= "table" then return { r = 1, g = 1, b = 1 } end
+        local r = tonumber(t.r); local g = tonumber(t.g); local b = tonumber(t.b)
+        if r == nil or g == nil or b == nil then return { r = 1, g = 1, b = 1 } end
+        if r < 0 then r = 0 elseif r > 1 then r = 1 end
+        if g < 0 then g = 0 elseif g > 1 then g = 1 end
+        if b < 0 then b = 0 elseif b > 1 then b = 1 end
+        return { r = r, g = g, b = b }
+    end
+
+    PerfFrameDB.customTextColor = normalizeColor(PerfFrameDB.customTextColor)
+    PerfFrameDB.customFPSColor  = normalizeColor(PerfFrameDB.customFPSColor)
+    PerfFrameDB.customMSColor   = normalizeColor(PerfFrameDB.customMSColor)
+end
+
+if PerfFrameDB.showFPS == nil then PerfFrameDB.showFPS = true end
+if PerfFrameDB.showMS == nil then PerfFrameDB.showMS = true end
 -- Create main frame
 PerfFrame = CreateFrame("Frame", "PerfFrame", UIParent)
 PerfFrame:EnableMouse(true)
@@ -260,6 +315,7 @@ PFPos:RegisterEvent("ADDON_LOADED")
 PFPos:RegisterEvent("PLAYER_LOGIN")
 PFPos:RegisterEvent("PLAYER_ENTERING_WORLD")
 PFPos:RegisterEvent("PLAYER_LOGOUT")
+PFPos:RegisterEvent("MODIFIER_STATE_CHANGED")
 PFPos:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 ~= "PerfFrame" then return end
 
@@ -268,6 +324,13 @@ PFPos:SetScript("OnEvent", function(self, event, arg1)
         PerfFrame_SaveCurrentPosition()
         return
     end
+    if event == "MODIFIER_STATE_CHANGED" then
+        if PerfFrame and PerfFrame._pfTooltipActive and GameTooltip:IsOwned(PerfFrame) and PerfFrame._showTooltipFunc then
+            PerfFrame._showTooltipFunc(PerfFrame)
+        end
+        return
+    end
+
 
     -- If custom position was just enabled but no custom pos exists yet, initialize from global
     if PerfFrameCharDB and PerfFrameCharDB.useCustomPosition and not PerfFrameCharDB.framePos then
@@ -367,86 +430,109 @@ CF:SetScript("OnEvent", function(self, event)
     local FONT = STANDARD_TEXT_FONT
     local addonList = 50
     local font = FONT
-    local baseFontSize = 12
     local fontFlag = "THINOUTLINE"
     local textAlign = "CENTER"
     local customColor = true
     local useShadow = false
     local fontSize = (PerfFrameDB.fontSize or 12)
 
-    -- Determine color
-    local color
+    -- Determine colors
+    local classColor
     if not customColor then
-        color = { r = 1, g = 1, b = 1 }
+        classColor = { r = 1, g = 1, b = 1 }
     else
         local _, class = UnitClass("player")
-        color = (CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS)[class]
+        classColor = (CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS)[class]
     end
 
-    -- Gradient for memory usage
-    local gradientColor = { 0,1,0, 1,1,0, 1,0,0 }
-    local function RGBGradient(num)
-        local perc = math.min(num,1)
-        local r1,g1,b1,r2,g2,b2,r3,g3,b3 = unpack(gradientColor)
-        if perc < 0.5 then
-            return r1+(r2-r1)*(perc*2), g1+(g2-g1)*(perc*2), b1+(b2-b1)*(perc*2)
+    local function ColorCodeFromRGB(r, g, b)
+        r = tonumber(r) or 1; g = tonumber(g) or 1; b = tonumber(b) or 1
+        if r < 0 then r = 0 elseif r > 1 then r = 1 end
+        if g < 0 then g = 0 elseif g > 1 then g = 1 end
+        if b < 0 then b = 0 elseif b > 1 then b = 1 end
+        return string.format("|cff%02x%02x%02x", math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
+    end
+
+    local function GetTextColorTables()
+        local mode = PerfFrameDB.textColorMode or "CLASS"
+
+	        -- The user's request is to color the *labels* ("fps" / "ms"), not the values.
+	        -- Keep the base string color white, and apply color codes only to the labels.
+	        if mode == "CUSTOM_BOTH" then
+	            local c = PerfFrameDB.customTextColor or classColor
+	            return { r = 1, g = 1, b = 1 }, c, c -- base white, fps label, ms label
+	        elseif mode == "CUSTOM_SPLIT" then
+	            local fpsC = PerfFrameDB.customFPSColor or classColor
+	            local msC  = PerfFrameDB.customMSColor or classColor
+	            return { r = 1, g = 1, b = 1 }, fpsC, msC -- base white, split label colors
+	        else
+	            return { r = 1, g = 1, b = 1 }, classColor, classColor
+	        end
+    end
+
+    -- Tooltip header color stays class-based for consistency
+    local color = classColor
+    -- Memory usage color and formatting helpers
+    local function HeatColor(pct)
+        if pct < 0 then pct = 0 end
+        if pct > 1 then pct = 1 end
+
+        if pct < 0.5 then
+            local t = pct * 2
+            return t, 1, 0
         else
-            local p = (perc-0.5)*2
-            return r2+(r3-r2)*p, g2+(g3-g2)*p, b2+(b3-b2)*p
+            local t = (pct - 0.5) * 2
+            return 1, 1 - t, 0
         end
     end
 
-    local function memFormat(number)
-        if number > 1024 then
-            return string.format("%.2f mb", number/1024)
-        else
-            return string.format("%.1f kb", floor(number))
+    local function formatKB(kb)
+        if kb >= 1024 then
+            return string.format("%.2f mb", kb / 1024)
         end
+        return string.format("%.1f kb", floor(kb))
     end
 
-    local function getFPS() return "|c00ffffff"..floor(GetFramerate()).."|r fps" end
-    local function getLatencyRaw() return select(3, GetNetStats()) end
-    local function getLatencyWorldRaw() return select(4, GetNetStats()) end
-    local function getLatency() return "|c00ffffff"..getLatencyRaw().."|r ms" end
-    local function getLatencyWorld() return "|c00ffffff"..getLatencyWorldRaw().."|r ms" end
-
-
-    local function getTimePlain()
-        local hour, min = tonumber(date("%H")), tonumber(date("%M"))
-        if PerfFrameDB.clockFormat == "12h" then
-            local ampm = hour >= 12 and "PM" or "AM"
-            hour = hour % 12
-            if hour == 0 then hour = 12 end
-            return string.format("%02d:%02d %s", hour, min, ampm)
-        else
-            return string.format("%02d:%02d", hour, min)
-        end
-    end
-    local function getTime()
-        if PerfFrameDB.showClock then
-            local hour, min = tonumber(date("%H")), tonumber(date("%M"))
-            local formattedTime
-            if PerfFrameDB.clockFormat == "12h" then
-                local ampm = hour >= 12 and "PM" or "AM"
-                hour = hour % 12
-                if hour == 0 then hour = 12 end
-                formattedTime = string.format("%02d:%02d %s", hour, min, ampm)
+    
+    local function MemoryColor(kb, maxKB)
+        -- Hybrid scaling:
+        -- If the largest addon is 20 MB or more, use absolute thresholds for readability.
+        -- Otherwise, use a relative gradient so small addon setups still show contrast.
+        if maxKB and maxKB >= (20 * 1024) then
+            local mb = kb / 1024
+            if mb < 5 then
+                return 0, 1, 0
+            elseif mb < 20 then
+                return 1, 1, 0
+            elseif mb < 100 then
+                return 1, 0.65, 0
             else
-                formattedTime = string.format("%02d:%02d", hour, min)
+                return 1, 0, 0
             end
-        return "|TInterface\\Icons\\INV_Misc_PocketWatch_01.blp:14:14|t " .. formattedTime
         end
-        return ""
+
+        if not maxKB or maxKB <= 0 then
+            return 1, 1, 1
+        end
+
+        return HeatColor(kb / maxKB)
     end
 
-    local function getMail()
-    if PerfFrameDB.showMail and HasNewMail() then
-        return " |TInterface\\Minimap\\TRACKING\\Mailbox.blp:14:14|t"
-    end
-        return ""
-    end
+	local function getFPS()
+	        local _, fpsC = GetTextColorTables()
+	        local cc = ColorCodeFromRGB(fpsC.r, fpsC.g, fpsC.b)
+	        return floor(GetFramerate()).." "..cc.."FPS|r"
+	    end
+    local function getLatencyRaw() return select(3, GetNetStats()) end
+	    local function getLatency()
+	        local _, _, msC = GetTextColorTables()
+	        local cc = ColorCodeFromRGB(msC.r, msC.g, msC.b)
+	        return getLatencyRaw().." "..cc.."MS|r"
+	    end
 
-    -- =========================================
+
+
+        -- =========================================
     -- External refresh helper (used by options UI)
     -- =========================================
     function PerfFrame_RefreshDisplay()
@@ -460,8 +546,8 @@ CF:SetScript("OnEvent", function(self, event)
         else
             text = getFPS().." "..getLatency()
         end
-        if PerfFrameDB.showClock then text = text.." "..getTime() end
-        if PerfFrameDB.showMail then text = text.." "..getMail() end
+        local baseC = select(1, GetTextColorTables())
+        PerfFrame.text:SetTextColor(baseC.r, baseC.g, baseC.b)
         PerfFrame.text:SetText(text)
         PerfFrame:SetWidth(PerfFrame.text:GetStringWidth() + 12)
         PerfFrame:SetHeight(PerfFrame.text:GetStringHeight() + 8)
@@ -488,6 +574,101 @@ CF:SetScript("OnEvent", function(self, event)
 
         -- Bind hover handlers if either tooltip or hide-until-hover is enabled
         if PerfFrameDB.showTooltip or PerfFrameDB.hideUntilHover then
+            local PF_BRAND_TITLE = "|cffF59A23Perf|cff3FC7FFFrame|r"
+            local function BuildTooltip(owner)
+                local success, err = pcall(function()
+                    GameTooltip:ClearLines()
+                    GameTooltip:SetOwner(owner, "ANCHOR_BOTTOMLEFT")
+
+                    GameTooltip:AddLine(PF_BRAND_TITLE)
+                    GameTooltip:AddLine("Hold |cffffd200ALT + Drag|r to reposition.", 1, 1, 1)
+                    GameTooltip:AddLine("Type |cffffd200/pf|r for settings.", 1, 1, 1)
+
+                    if PerfFrameDB.showAddonMemory then
+                        local entries, total = {}, 0
+
+                        UpdateAddOnMemoryUsage()
+                        GameTooltip:AddLine(" ")
+                        GameTooltip:AddLine("AddOn Memory", color.r, color.g, color.b)
+
+                        for i = 1, safe_GetNumAddOns() do
+                            local kb = safe_GetAddOnMemoryUsage(i)
+                            if kb and kb > 0 then
+                                local name = safe_GetAddOnInfo(i)
+                                entries[#entries + 1] = { name = name, kb = kb }
+                                total = total + kb
+                            end
+                        end
+
+                        table.sort(entries, function(a, b) return a.kb > b.kb end)
+
+                        local totalEntries = #entries
+                        local maxKB = entries[1] and entries[1].kb or 0
+
+                        local mode = PerfFrameDB.addonMemoryListMode or "TOP5"
+                        local baseLimit
+                        if mode == "ALL" then
+                            baseLimit = totalEntries
+                        elseif mode == "TOP5" then
+                            baseLimit = 5
+                        elseif mode == "TOP20" then
+                            baseLimit = 20
+                        else
+                            baseLimit = 10
+                        end
+
+                        local shiftAll = IsShiftKeyDown() and true or false
+                        local limit = shiftAll and totalEntries or baseLimit
+                        local showing = math.min(limit, totalEntries)
+
+                        for i = 1, showing do
+                            local entry = entries[i]
+                            local r, g, b = MemoryColor(entry.kb, maxKB)
+                            GameTooltip:AddDoubleLine(entry.name, formatKB(entry.kb), 1, 1, 1, r, g, b)
+                        end
+
+                        GameTooltip:AddLine(" ")
+
+                        -- Footer clarifies what is shown
+                        if totalEntries > 0 then
+                            local showingLine
+                            local hintLine
+
+                            if shiftAll and mode ~= "ALL" and totalEntries > baseLimit then
+                                showingLine = string.format("Showing all %d addons (Shift).", totalEntries)
+                            elseif mode == "ALL" or totalEntries <= baseLimit then
+                                if mode == "ALL" then
+                                    showingLine = string.format("Showing all %d addons.", totalEntries)
+                                else
+                                    showingLine = string.format("Showing all %d addons (Top %d).", totalEntries, baseLimit)
+                                end
+                            else
+                                showingLine = string.format("Showing top %d of %d addons.", baseLimit, totalEntries)
+                                hintLine = "Hold Shift to show all."
+                            end
+
+                            GameTooltip:AddLine(showingLine, 0.7, 0.7, 0.7)
+                            if hintLine then
+                                GameTooltip:AddLine(hintLine, 0.7, 0.7, 0.7)
+                            end
+                        end
+
+                        GameTooltip:AddLine(" ")
+                        local tr, tg, tb = MemoryColor(total, maxKB)
+                        GameTooltip:AddDoubleLine("Total AddOns", formatKB(total), 1, 1, 1, tr, tg, tb)
+                    end
+                end)
+
+                if not success then
+                    GameTooltip:ClearLines()
+                    GameTooltip:AddLine("Tooltip error: " .. tostring(err), 1, 0, 0)
+                end
+
+                GameTooltip:Show()
+            end
+
+            PerfFrame._showTooltipFunc = BuildTooltip
+
             PerfFrame:SetScript("OnEnter", function(self)
                 if PerfFrameDB.hideUntilHover then
                     self:SetAlpha(1)
@@ -497,61 +678,11 @@ CF:SetScript("OnEvent", function(self, event)
                     return
                 end
 
-                local success, err = pcall(function()
-                    GameTooltip:ClearLines()
-                    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
-
-                    GameTooltip:AddLine("PerfFrame", color.r, color.g, color.b)
-                    GameTooltip:AddLine("Hold |cffffd200ALT + Drag|r to reposition.", 1, 1, 1)
-                    GameTooltip:AddLine("Type |cffffd200/pf|r for settings.", 1, 1, 1)
-
-                    if PerfFrameDB.showClock then
-                        GameTooltip:AddDoubleLine("Time", getTimePlain(), 1, 1, 1, 1, 1, 1)
-                    end
-                    if PerfFrameDB.showMail then
-                        GameTooltip:AddDoubleLine("Mail", HasNewMail() and "New mail" or "No mail", 1, 1, 1, 1, 1, 1)
-                    end
-
-                    if PerfFrameDB.showAddonMemory then
-                        local blizz = collectgarbage("count")
-                        local addons, entry, memory, total, nr = {}, nil, nil, 0, 0
-                        UpdateAddOnMemoryUsage()
-                        GameTooltip:AddLine(" ")
-                        GameTooltip:AddLine("AddOns", color.r, color.g, color.b)
-
-                        for i = 1, safe_GetNumAddOns() do
-                            memory = safe_GetAddOnMemoryUsage(i)
-                            if memory and memory > 0 then
-                                entry = { name = safe_GetAddOnInfo(i), memory = memory }
-                                table.insert(addons, entry)
-                                total = total + memory
-                            end
-                        end
-
-                        table.sort(addons, function(a, b) return a.memory > b.memory end)
-                        for _, entry in pairs(addons) do
-                            if nr < addonList then
-                                GameTooltip:AddDoubleLine(entry.name, memFormat(entry.memory), 1, 1, 1, RGBGradient(entry.memory / 800))
-                                nr = nr + 1
-                            end
-                        end
-
-                        GameTooltip:AddLine(" ")
-                        GameTooltip:AddDoubleLine("Total", memFormat(total), 1, 1, 1, RGBGradient(total / (1024 * 10)))
-                        GameTooltip:AddDoubleLine("Total+Blizzard", memFormat(blizz), 1, 1, 1, RGBGradient(blizz / (1024 * 10)))
-                    end
-                end)
-
-                -- Added safety handling for tooltip errors
-                if not success then
-                    GameTooltip:ClearLines()
-                    GameTooltip:AddLine("Tooltip error: " .. tostring(err), 1, 0, 0)
-                end
-
-                GameTooltip:Show()
+                PerfFrame._pfTooltipActive = true
+                BuildTooltip(self)
             end)
-
             PerfFrame:SetScript("OnLeave", function(self)
+                PerfFrame._pfTooltipActive = false
                 if PerfFrameDB.showTooltip then
                     GameTooltip:Hide()
                 end
@@ -587,7 +718,8 @@ PerfFrame_SetBackgroundOpacity(PerfFrameDB.backgroundOpacity or 0)
         PerfFrame.text:SetShadowOffset(1,-1)
         PerfFrame.text:SetShadowColor(0,0,0)
     end
-    PerfFrame.text:SetTextColor(color.r, color.g, color.b)
+    local baseC = select(1, GetTextColorTables())
+    PerfFrame.text:SetTextColor(baseC.r, baseC.g, baseC.b)
 
     -- =========================================
     -- OnUpdate handler
@@ -611,8 +743,6 @@ local lastUpdate = 0
             else
                 text = getFPS().." "..getLatency()
             end
-            if PerfFrameDB.showClock then text = text.." "..getTime() end
-            if PerfFrameDB.showMail then text = text.." "..getMail() end
             PerfFrame.text:SetText(text)
             self:SetWidth(PerfFrame.text:GetStringWidth() + 12)
             self:SetHeight(PerfFrame.text:GetStringHeight() + 8)
