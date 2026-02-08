@@ -1,6 +1,6 @@
 ## Interface: 11508
 ## Title: PerfFrame
-## Version: v2.3.1
+## Version: v2.3.2
 ## Author: Sawfty
 ## Notes: Lightweight frame that displays your FPS and latency so you can blame lag with confidence.
 ## DefaultState: Enabled
@@ -9,7 +9,7 @@
 ## X-Category: Interface Enhancements
 ## IconTexture: Interface\AddOns\PerfFrame\assets\icon.tga
 
-
+PerfFrameTokens.lua
 locales/enUS.lua
 locales/deDE.lua
 locales/frFR.lua
