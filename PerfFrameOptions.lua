@@ -1,14 +1,15 @@
 -- =========================================
 -- PerfFrame Options Panel
 -- =========================================
-local addonName = ...
+local addonName, ns = ...
+local L = (ns and ns.L) or setmetatable({}, { __index = function(t, k) return k end })
+local PF = ns.PF
+
 local addonVersion = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version"))
     or (GetAddOnMetadata and GetAddOnMetadata(addonName, "Version"))
     or "unknown"
 
--- =========================================
 -- Helpers
--- =========================================
 local spacing = 20
 
 -- Slider value highlight colors (use text defaults at runtime; gold matches label tone)
@@ -337,7 +338,7 @@ Home:SetScript("OnShow", function(self)
         title:SetPoint("BOTTOMLEFT", 29, 16)
 
         local version = boundingBox:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-        version:SetText(string.format("Version %s", addonVersion))
+        version:SetText(string.format(L.OPT_VERSION_FMT, addonVersion))
         version:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 7, 2)
 
         local divider = boundingBox:CreateTexture()
@@ -394,7 +395,7 @@ Home:SetScript("OnShow", function(self)
     end
     self._UpdatePerfFrameScrollRange = UpdateScrollRange
 
-    local configurationTitle = CreateOptionsTitle(contents, "Settings", nil)
+    local configurationTitle = CreateOptionsTitle(contents, L.OPT_HEADER_SETTINGS, nil)
     local configurationFrame = CreateFrame("Frame", nil, contents, "ResizeLayoutFrame")
     configurationFrame:SetPoint("LEFT")
     configurationFrame:SetPoint("RIGHT")
@@ -407,7 +408,7 @@ Home:SetScript("OnShow", function(self)
     tipFrame.Label = tipFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     tipFrame.Label:SetJustifyH("LEFT")
     tipFrame.Label:SetPoint("LEFT", 16, 0)
-    tipFrame.Label:SetText("|cFFFF0000TIP:|r You can access these settings quickly by using the |cffffd200/pf|r command.")
+    tipFrame.Label:SetText(string.format(L.OPT_TIP_ACCESS, PF.TIP, PF.CMD_PF))
 
 
 -- row builder
@@ -430,7 +431,7 @@ end
 -- =========================================
 -- PerfFrame Visibility
 -- =========================================
-local disableRow = CreateRow(configurationFrame, nil, "Disable PerfFrame")
+local disableRow = CreateRow(configurationFrame, nil, L.OPT_DISABLE_TITLE)
 local disableCB = CreateFrame("CheckButton", nil, disableRow, "UICheckButtonTemplate")
 disableCB:SetSize(30, 29)
 disableCB:SetPoint("LEFT", 230, 0)
@@ -449,14 +450,14 @@ end)
 disableCB:SetChecked(PerfFrameDB.disabled and true or false)
 self._disableCB = disableCB
 AttachTooltip({
-    "Disable PerfFrame",
-    "Hides the PerfFrame display.",
+    L.OPT_DISABLE_TITLE,
+    L.OPT_DISABLE_DESC,
 }, disableRow.Label)
 
 -- =========================================
 -- Frame Information
 -- =========================================
-local frameInfoRow = CreateRow(configurationFrame, disableRow, "Frame Information")
+local frameInfoRow = CreateRow(configurationFrame, disableRow, L.OPT_FRAMEINFO_TITLE)
 
 local function GetFrameInfoValue()
     local showFPS = PerfFrameDB.showFPS and true or false
@@ -471,9 +472,9 @@ local frameInfoPopout
 frameInfoPopout = PerfFrameTemplates.CreatePFPopout(
     frameInfoRow,
     {
-        { label = "Show All",      value = "ALL", selected = GetFrameInfoValue() == "ALL" },
-        { label = "Show FPS Only", value = "FPS", selected = GetFrameInfoValue() == "FPS" },
-        { label = "Show MS Only",  value = "MS",  selected = GetFrameInfoValue() == "MS"  },
+        { label = L.DD_FRAMEINFO_ALL,      value = "ALL", selected = GetFrameInfoValue() == "ALL" },
+        { label = L.DD_FRAMEINFO_FPS, value = "FPS", selected = GetFrameInfoValue() == "FPS" },
+        { label = L.DD_FRAMEINFO_MS,  value = "MS",  selected = GetFrameInfoValue() == "MS"  },
     },
     function()
         local v = frameInfoPopout.selected.value
@@ -497,8 +498,8 @@ frameInfoPopout:SetPoint("LEFT", 230, 0)
 if frameInfoPopout.Popout and frameInfoPopout.Popout.Layout then frameInfoPopout.Popout:Layout() end
 self._frameInfoPopout = frameInfoPopout
 AttachTooltip({
-    "Frame Information",
-    "Choose what to show inside the frame (FPS, MS, or both).",
+    L.OPT_FRAMEINFO_TITLE,
+    L.OPT_FRAMEINFO_DESC,
 }, frameInfoRow.Label)
 
 function frameInfoPopout:SetSelectedValue(val)
@@ -513,7 +514,7 @@ end
 -- =========================================
 -- Combat Toggles
 -- =========================================
-local combatRow = CreateRow(configurationFrame, frameInfoRow, "Combat Toggle")
+local combatRow = CreateRow(configurationFrame, frameInfoRow, L.OPT_COMBAT_TITLE)
 
 local function GetCombatModeValue()
     return PerfFrameDB.combatMode or "ALWAYS"
@@ -523,9 +524,9 @@ local combatPopout
 combatPopout = PerfFrameTemplates.CreatePFPopout(
     combatRow,
     {
-        { label = "Always Show",         value = "ALWAYS",        selected = GetCombatModeValue() == "ALWAYS" },
-        { label = "Show Only in Combat", value = "IN_COMBAT",     selected = GetCombatModeValue() == "IN_COMBAT" },
-        { label = "Hide When in Combat", value = "OUT_OF_COMBAT", selected = GetCombatModeValue() == "OUT_OF_COMBAT" },
+        { label = L.DD_COMBAT_ALWAYS,         value = "ALWAYS",        selected = GetCombatModeValue() == "ALWAYS" },
+        { label = L.DD_COMBAT_IN_COMBAT, value = "IN_COMBAT",     selected = GetCombatModeValue() == "IN_COMBAT" },
+        { label = L.DD_COMBAT_OUT_COMBAT, value = "OUT_OF_COMBAT", selected = GetCombatModeValue() == "OUT_OF_COMBAT" },
     },
     function()
         local v = combatPopout.selected.value
@@ -541,8 +542,8 @@ combatPopout:SetPoint("LEFT", 230, 0)
 if combatPopout.Popout and combatPopout.Popout.Layout then combatPopout.Popout:Layout() end
 self._combatPopout = combatPopout
 AttachTooltip({
-    "Combat Toggle",
-    "Controls when the frame is visible based on combat state.",
+    L.OPT_COMBAT_TITLE,
+    L.OPT_COMBAT_DESC,
 }, combatRow.Label)
 
 function combatPopout:SetSelectedValue(val)
@@ -557,7 +558,7 @@ end
 -- =========================================
 -- Hide Until Mouseover
 -- =========================================
-local hoverRow = CreateRow(configurationFrame, combatRow, "Hide Until Mouseover")
+local hoverRow = CreateRow(configurationFrame, combatRow, L.OPT_HOVER_TITLE)
 local hoverCB = CreateFrame("CheckButton", nil, hoverRow, "UICheckButtonTemplate")
 hoverCB:SetSize(30, 29)
 hoverCB:SetPoint("LEFT", 230, 0)
@@ -569,14 +570,14 @@ end)
 hoverCB:SetChecked(PerfFrameDB.hideUntilHover and true or false)
 self._hideUntilHoverCB = hoverCB
 AttachTooltip({
-    "Hide Until Mouseover",
-    "When enabled, the frame is hidden until you hover your mouse over it.",
+    L.OPT_HOVER_TITLE,
+    L.OPT_HOVER_DESC,
 }, hoverRow.Label)
 
 -- =========================================
 -- Show Addon Memory
 -- =========================================
-local addonMemRow = CreateRow(configurationFrame, hoverRow, "Show Addon Memory")
+local addonMemRow = CreateRow(configurationFrame, hoverRow, L.OPT_ADDONMEM_TITLE)
 local addonMemCB = CreateFrame("CheckButton", nil, addonMemRow, "UICheckButtonTemplate")
 addonMemCB:SetSize(30, 29)
 addonMemCB:SetPoint("LEFT", 230, 0)
@@ -588,14 +589,14 @@ end)
 addonMemCB:SetChecked(PerfFrameDB.showAddonMemory and true or false)
 self._addonMemCB = addonMemCB
 AttachTooltip({
-    "Show Addon Memory",
-    "When enabled, the tooltip will include an AddOn memory usage list.",
+    L.OPT_ADDONMEM_TITLE,
+    L.OPT_ADDONMEM_DESC,
 }, addonMemRow.Label)
 
 -- =========================================
 -- AddOn Memory List
 -- =========================================
-local addonMemListRow = CreateRow(configurationFrame, addonMemRow, "AddOn Memory List")
+local addonMemListRow = CreateRow(configurationFrame, addonMemRow, L.OPT_ADDONMEMLIST_TITLE)
 
 local function GetAddonMemListValue()
     local v = PerfFrameDB.addonMemoryListMode or "TOP5"
@@ -607,10 +608,10 @@ local addonMemListPopout
 addonMemListPopout = PerfFrameTemplates.CreatePFPopout(
     addonMemListRow,
     {
-        { label = "Top 5",  value = "TOP5",  selected = GetAddonMemListValue() == "TOP5" },
-        { label = "Top 10", value = "TOP10", selected = GetAddonMemListValue() == "TOP10" },
-        { label = "Top 20", value = "TOP20", selected = GetAddonMemListValue() == "TOP20" },
-        { label = "All",    value = "ALL",   selected = GetAddonMemListValue() == "ALL" },
+        { label = L.DD_TOP5,  value = "TOP5",  selected = GetAddonMemListValue() == "TOP5" },
+        { label = L.DD_TOP10, value = "TOP10", selected = GetAddonMemListValue() == "TOP10" },
+        { label = L.DD_TOP20, value = "TOP20", selected = GetAddonMemListValue() == "TOP20" },
+        { label = L.DD_ALL,    value = "ALL",   selected = GetAddonMemListValue() == "ALL" },
     },
     function()
         local v = addonMemListPopout.selected.value
@@ -622,16 +623,16 @@ addonMemListPopout:SetPoint("LEFT", 230, 0)
 if addonMemListPopout.Popout and addonMemListPopout.Popout.Layout then addonMemListPopout.Popout:Layout() end
 self._addonMemListPopout = addonMemListPopout
 AttachTooltip({
-    "AddOn Memory List",
-    "Choose how many entries are shown in the AddOn memory tooltip list.",
-    "If your installed AddOn count is below the selected limit, all entries will be shown.",
-    "Hold Shift while hovering to show all entries.",
+    L.OPT_ADDONMEMLIST_TITLE,
+    L.OPT_ADDONMEMLIST_DESC1,
+    L.OPT_ADDONMEMLIST_DESC2,
+    L.OPT_ADDONMEMLIST_DESC3,
 }, addonMemListRow.Label)
 
 -- =========================================
 -- Font Scaling
 -- =========================================
-local fontScaleRow = CreateRow(configurationFrame, addonMemListRow, "Font Scale")
+local fontScaleRow = CreateRow(configurationFrame, addonMemListRow, L.OPT_FONTSCALE_TITLE)
 local fontScaleSlider = CreateFrame("Frame", nil, fontScaleRow, "MinimalSliderWithSteppersTemplate")
 fontScaleSlider:Init(GetFontScale(), 0.5, 2, 100)
 fontScaleSlider:SetPoint("LEFT", 230, 0)
@@ -672,14 +673,14 @@ self._fontScaleOnValueChanged = PerfFrame_FontScale_OnValueChanged
 
 self._fontScaleSlider = fontScaleSlider
 AttachTooltip({
-    "Font Scale",
-    "Adjust the size of the text in the frame.",
+    L.OPT_FONTSCALE_TITLE,
+    L.OPT_FONTSCALE_DESC,
 }, fontScaleRow.Label)
 
 -- =========================================
 -- Background Opacity
 -- =========================================
-local bgOpacityRow = CreateRow(configurationFrame, fontScaleRow, "Background Opacity")
+local bgOpacityRow = CreateRow(configurationFrame, fontScaleRow, L.OPT_BGOPACITY_TITLE)
 self._bgOpacityRow = bgOpacityRow
 local bgOpacitySlider = CreateFrame("Frame", nil, bgOpacityRow, "MinimalSliderWithSteppersTemplate")
 bgOpacitySlider:Init(GetBackgroundOpacity(), 0, 100, 100)
@@ -722,15 +723,15 @@ self._bgOpacityOnValueChanged = PerfFrame_BgOpacity_OnValueChanged
 
 self._bgOpacitySlider = bgOpacitySlider
 AttachTooltip({
-    "Background Opacity",
-    "Adds a background behind the text and controls its transparency.",
-    "0 = no background, 100 = solid.",
+    L.OPT_BGOPACITY_TITLE,
+    L.OPT_BGOPACITY_DESC1,
+    L.OPT_BGOPACITY_DESC2,
 }, bgOpacityRow.Label)
 
 -- =========================================
 -- Text Colors
 -- =========================================
-local textColorsRow = CreateRow(configurationFrame, bgOpacityRow, "Text Colors")
+local textColorsRow = CreateRow(configurationFrame, bgOpacityRow, L.OPT_TEXTCOLORS_TITLE)
 
 local function GetTextColorModeValue()
     local v = PerfFrameDB.textColorMode or "CLASS"
@@ -742,9 +743,9 @@ local textColorModePopout
 textColorModePopout = PerfFrameTemplates.CreatePFPopout(
     textColorsRow,
     {
-        { label = "Class Colors", value = "CLASS", selected = GetTextColorModeValue() == "CLASS" },
-        { label = "Custom: One Color", value = "CUSTOM_BOTH", selected = GetTextColorModeValue() == "CUSTOM_BOTH" },
-        { label = "Custom: Separate (FPS/MS)", value = "CUSTOM_SPLIT", selected = GetTextColorModeValue() == "CUSTOM_SPLIT" },
+        { label = L.DD_TEXTCOLORS_CLASS, value = "CLASS", selected = GetTextColorModeValue() == "CLASS" },
+        { label = L.DD_TEXTCOLORS_ONE, value = "CUSTOM_BOTH", selected = GetTextColorModeValue() == "CUSTOM_BOTH" },
+        { label = L.DD_TEXTCOLORS_SPLIT, value = "CUSTOM_SPLIT", selected = GetTextColorModeValue() == "CUSTOM_SPLIT" },
     },
     function()
         local v = textColorModePopout.selected and textColorModePopout.selected.value or "CLASS"
@@ -757,13 +758,13 @@ textColorModePopout:SetPoint("LEFT", 230, 0)
 self._textColorModePopout = textColorModePopout
 
 AttachTooltip({
-    "Text Colors",
-    "Choose how FPS/MS text is colored.",
-    "Class Colors uses your class color (default).",
+    L.OPT_TEXTCOLORS_TITLE,
+    L.OPT_TEXTCOLORS_DESC1,
+    L.OPT_TEXTCOLORS_DESC2,
 }, textColorsRow.Label)
 
 -- Custom: One Color
-local oneColorRow = CreateRow(configurationFrame, textColorsRow, "Text Color")
+local oneColorRow = CreateRow(configurationFrame, textColorsRow, L.OPT_TEXTCOLOR_TITLE)
 local oneColorBtn = CreateColorSwatchButton(
     oneColorRow,
     function() return PerfFrameDB.customTextColor end,
@@ -774,12 +775,12 @@ local oneColorBtn = CreateColorSwatchButton(
 self._oneColorBtn = oneColorBtn
 self._oneColorRow = oneColorRow
 AttachTooltip({
-    "Text Color",
-    "Used when Text Colors is set to Custom: One Color.",
+    L.OPT_TEXTCOLOR_TITLE,
+    L.OPT_TEXTCOLOR_DESC,
 }, oneColorRow.Label)
 
 -- Custom: Separate Colors
-local fpsColorRow = CreateRow(configurationFrame, oneColorRow, "FPS Color")
+local fpsColorRow = CreateRow(configurationFrame, oneColorRow, L.OPT_FPSCOLOR_TITLE)
 local fpsColorBtn = CreateColorSwatchButton(
     fpsColorRow,
     function() return PerfFrameDB.customFPSColor end,
@@ -790,11 +791,11 @@ local fpsColorBtn = CreateColorSwatchButton(
 self._fpsColorBtn = fpsColorBtn
 self._fpsColorRow = fpsColorRow
 AttachTooltip({
-    "FPS Color",
-    "Used when Text Colors is set to Custom: Separate (FPS/MS).",
+    L.OPT_FPSCOLOR_TITLE,
+    L.OPT_FPSCOLOR_DESC,
 }, fpsColorRow.Label)
 
-local msColorRow = CreateRow(configurationFrame, fpsColorRow, "MS Color")
+local msColorRow = CreateRow(configurationFrame, fpsColorRow, L.OPT_MSCOLOR_TITLE)
 local msColorBtn = CreateColorSwatchButton(
     msColorRow,
     function() return PerfFrameDB.customMSColor end,
@@ -805,8 +806,8 @@ local msColorBtn = CreateColorSwatchButton(
 self._msColorBtn = msColorBtn
 self._msColorRow = msColorRow
 AttachTooltip({
-    "MS Color",
-    "Used when Text Colors is set to Custom: Separate (FPS/MS).",
+    L.OPT_MSCOLOR_TITLE,
+    L.OPT_MSCOLOR_DESC,
 }, msColorRow.Label)
 
 -- enable/disable the relevant swatches without reflowing layout
@@ -866,7 +867,7 @@ function Home:_UpdateTextColorControls()
     if self._msColorBtn and self._msColorBtn.UpdateSwatch then self._msColorBtn:UpdateSwatch() end
 end
 
-local customPosRow = CreateRow(configurationFrame, textColorsRow, "Use Custom Frame Position")
+local customPosRow = CreateRow(configurationFrame, textColorsRow, L.OPT_CUSTOMPOS_TITLE)
 self._customPosRow = customPosRow
 local useCustomCB = CreateFrame("CheckButton", nil, customPosRow, "UICheckButtonTemplate")
 useCustomCB:SetSize(30, 29)
@@ -905,23 +906,23 @@ PerfFrameCharDB = PerfFrameCharDB or {}
 useCustomCB:SetChecked(PerfFrameCharDB.useCustomPosition and true or false)
 self._useCustomCB = useCustomCB
 AttachTooltip({
-    "Use Custom Frame Position",
-    "When enabled, the frame position becomes specific to this character.",
+    L.OPT_CUSTOMPOS_TITLE,
+    L.OPT_CUSTOMPOS_DESC,
 }, customPosRow.Label)
 
 -- =========================================
 -- Reset Frame Position
 -- =========================================
-local resetRow = CreateRow(configurationFrame, customPosRow, "Reset Position")
+local resetRow = CreateRow(configurationFrame, customPosRow, L.OPT_RESET_TITLE)
 resetRow:SetHeight(resetRow:GetHeight() + 10) -- add a buffer to avoid encroaching on the slider
 local resetBtn = CreateFrame("Button", nil, resetRow, "UIPanelButtonTemplate")
 resetBtn:SetPoint("LEFT", 230, 0)
 resetBtn:SetSize(200, 26)
-resetBtn:SetText("Reset Position")
+resetBtn:SetText(L.OPT_RESET_TITLE)
 
 if not StaticPopupDialogs["PERFFRAME_RESET_POSITION"] then
     StaticPopupDialogs["PERFFRAME_RESET_POSITION"] = {
-        text = "Reset PerfFrame position to the default center location?",
+        text = L.OPT_RESET_CONFIRM,
         button1 = YES,
         button2 = NO,
         OnAccept = function()
@@ -955,8 +956,8 @@ resetBtn:SetScript("OnClick", function()
 end)
 
 AttachTooltip({
-    "Reset Position",
-    "Resets the frame position to the default center point.",
+    L.OPT_RESET_TITLE,
+    L.OPT_RESET_DESC,
 }, resetRow.Label)
 
     -- ensure Text Colors conditional rows are laid out correctly on first open/reload
@@ -967,7 +968,7 @@ AttachTooltip({
 -- =========================================
 -- Credits
 -- =========================================
-local creditsTitle = CreateOptionsTitle(contents, "Credits", resetRow)
+local creditsTitle = CreateOptionsTitle(contents, L.OPT_HEADER_CREDITS, resetRow)
 local creditsFrame = CreateFrame("Frame", nil, contents, "ResizeLayoutFrame")
 creditsFrame:SetPoint("LEFT")
 creditsFrame:SetPoint("RIGHT")
@@ -983,12 +984,7 @@ local creditsText = creditsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighl
 creditsText:SetJustifyH("LEFT")
 creditsText:SetPoint("TOPLEFT", 16, -8)
 creditsText:SetPoint("RIGHT", -16, 0)
-creditsText:SetText(
-    "|cFFFFFFFFPerfFrame|r is a lightweight frame that displays your FPS and latency,\n\n" ..
-    "    |cFFD8B36Aso you can blame lag with confidence.|r\n\n" ..
-    "Created by |cFFFFFFFFSawfty|r. Inspired by FPS-MS-Tracker.\n\n" ..
-    "Special thanks to |cFF8C1010TomCat|r for inspiration on the settings panel layout."
-)
+creditsText:SetText(string.format(L.CREDITS_TEXT, PF.ADDON, PF.TAGLINE, PF.AUTHOR, PF.TOMCAT))
 
 end)
 
@@ -1016,6 +1012,6 @@ function PerfFrame_OpenOptions()
         InterfaceOptionsFrame_OpenToCategory(Home)
     else
         -- Last-resort fallback: just show a message
-        print("PerfFrame: Open Settings -> AddOns -> PerfFrame")
+        print(L.ERR_OPEN_SETTINGS_FALLBACK)
     end
 end

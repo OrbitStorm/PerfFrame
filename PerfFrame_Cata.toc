@@ -9,6 +9,19 @@
 ## X-Category: Interface Enhancements
 ## IconTexture: Interface\AddOns\PerfFrame\assets\icon.tga
 
+
+locales/enUS.lua
+locales/deDE.lua
+locales/frFR.lua
+locales/esES.lua
+locales/esMX.lua
+locales/itIT.lua
+locales/ptBR.lua
+locales/ruRU.lua
+locales/koKR.lua
+locales/zhCN.lua
+locales/zhTW.lua
+
 PerfFrame.lua
 PerfFramePopout.lua
 PerfFrameOptions.lua

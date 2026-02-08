@@ -2,6 +2,10 @@
 -- PerfFrame - The Mainframe 
 -- =========================================
 
+local addonName, ns = ...
+local L = (ns and ns.L) or setmetatable({}, { __index = function(t, k) return k end })
+local PF = ns.PF
+
 -- Initialize SavedVariables
 if type(PerfFrameDB) ~= "table" then PerfFrameDB = nil end
 PerfFrameDB = PerfFrameDB or {
@@ -14,7 +18,6 @@ PerfFrameDB = PerfFrameDB or {
     showAddonMemory = false,
 	showFPS = true,
     showMS = true,
-
     addonMemoryListMode = "TOP5",
 
     textColorMode = "CLASS", -- "CLASS" | "CUSTOM_BOTH" | "CUSTOM_SPLIT"
@@ -374,15 +377,15 @@ SlashCmdList["PERFFRAME"] = function(msg)
     end
 
     if msg == "help" then
-        print("|cffffd200PerfFrame|r commands:")
-        print("|cffffd200/pf|r - Open settings panel")
-        print("|cffffd200/pf reset|r - Reset frame position")
+        print(string.format(L.CMD_LIST_HEADER, PF.ADDON))
+        print(string.format(L.CMD_OPEN_SETTINGS, PF.CMD_PF))
+        print(string.format(L.CMD_RESET, PF.CMD_PF_RESET))
         return
     end
 
     if msg == "reset" then
         if not PerfFrame then
-            print("PerfFrame: frame not loaded yet.")
+            print(L.ERR_FRAME_NOT_LOADED)
             return
         end
 
@@ -407,11 +410,11 @@ SlashCmdList["PERFFRAME"] = function(msg)
             PerfFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
         end
 
-        print("PerfFrame position reset to center.")
+        print(L.MSG_RESET_CENTER)
         return
     end
 
-    print("PerfFrame: unknown command. Type |cffffd200/pf help|r")
+    print(string.format(L.ERR_UNKNOWN_COMMAND, PF.CMD_PF_HELP))
 end
 
 -- =========================================
@@ -568,15 +571,15 @@ CF:SetScript("OnEvent", function(self, event)
                     GameTooltip:SetOwner(owner, "ANCHOR_BOTTOMLEFT")
 
                     GameTooltip:AddLine(PF_BRAND_TITLE)
-                    GameTooltip:AddLine("Hold |cffffd200ALT + Drag|r to reposition.", 1, 1, 1)
-                    GameTooltip:AddLine("Type |cffffd200/pf|r for settings.", 1, 1, 1)
+                    GameTooltip:AddLine(string.format(L.TT_REPOSITION_HINT, PF.ALT_DRAG), 1, 1, 1)
+                    GameTooltip:AddLine(string.format(L.TT_SETTINGS_HINT, PF.CMD_PF), 1, 1, 1)
 
                     if PerfFrameDB.showAddonMemory then
                         local entries, total = {}, 0
 
                         UpdateAddOnMemoryUsage()
                         GameTooltip:AddLine(" ")
-                        GameTooltip:AddLine("AddOn Memory", classColor.r, classColor.g, classColor.b)
+                        GameTooltip:AddLine(L.TT_ADDON_MEMORY_TITLE, classColor.r, classColor.g, classColor.b)
 
                         for i = 1, safe_GetNumAddOns() do
                             local kb = safe_GetAddOnMemoryUsage(i)
@@ -622,16 +625,16 @@ CF:SetScript("OnEvent", function(self, event)
                             local hintLine
 
                             if shiftAll and mode ~= "ALL" and totalEntries > baseLimit then
-                                showingLine = string.format("Showing all %d addons (Shift).", totalEntries)
+                                showingLine = string.format(L.TT_SHOWING_ALL_SHIFT, totalEntries)
                             elseif mode == "ALL" or totalEntries <= baseLimit then
                                 if mode == "ALL" then
-                                    showingLine = string.format("Showing all %d addons.", totalEntries)
+                                    showingLine = string.format(L.TT_SHOWING_ALL, totalEntries)
                                 else
-                                    showingLine = string.format("Showing all %d addons (Top %d).", totalEntries, baseLimit)
+                                    showingLine = string.format(L.TT_SHOWING_ALL_TOP, totalEntries, baseLimit)
                                 end
                             else
-                                showingLine = string.format("Showing top %d of %d addons.", baseLimit, totalEntries)
-                                hintLine = "Hold Shift to show all."
+                                showingLine = string.format(L.TT_SHOWING_TOP_OF, baseLimit, totalEntries)
+                                hintLine = L.TT_HOLD_SHIFT
                             end
 
                             GameTooltip:AddLine(showingLine, 0.7, 0.7, 0.7)
@@ -642,13 +645,13 @@ CF:SetScript("OnEvent", function(self, event)
 
                         GameTooltip:AddLine(" ")
                         local tr, tg, tb = MemoryColor(total, maxKB)
-                        GameTooltip:AddDoubleLine("Total AddOns", formatKB(total), 1, 1, 1, tr, tg, tb)
+                        GameTooltip:AddDoubleLine(L.TT_TOTAL_ADDONS, formatKB(total), 1, 1, 1, tr, tg, tb)
                     end
                 end)
 
                 if not success then
                     GameTooltip:ClearLines()
-                    GameTooltip:AddLine("Tooltip error: " .. tostring(err), 1, 0, 0)
+                    GameTooltip:AddLine(string.format(L.TT_ERR_TOOLTIP, tostring(err)), 1, 0, 0)
                 end
 
                 GameTooltip:Show()
@@ -695,23 +698,23 @@ if not PerfFrame.bg then
     PerfFrame.bg:SetPoint("BOTTOMRIGHT", PerfFrame, "BOTTOMRIGHT", 6, -4)
 end
 PerfFrame_SetBackgroundOpacity(PerfFrameDB.backgroundOpacity or 0)
--- =========================================
-    -- Font string
-    -- =========================================
-    PerfFrame.text = PerfFrame:CreateFontString(nil, "BACKGROUND")
-    PerfFrame.text:SetPoint(textAlign, PerfFrame)
-    PerfFrame.text:SetFont(font, fontSize, fontFlag)
-    if useShadow then
-        PerfFrame.text:SetShadowOffset(1,-1)
-        PerfFrame.text:SetShadowColor(0,0,0)
-    end
-    local baseC = select(1, GetTextColorTables())
-    PerfFrame.text:SetTextColor(baseC.r, baseC.g, baseC.b)
 
-    -- =========================================
-    -- OnUpdate handler
-    -- =========================================
-    
+-- =========================================
+-- Font string
+-- =========================================
+PerfFrame.text = PerfFrame:CreateFontString(nil, "BACKGROUND")
+PerfFrame.text:SetPoint(textAlign, PerfFrame)
+PerfFrame.text:SetFont(font, fontSize, fontFlag)
+if useShadow then
+    PerfFrame.text:SetShadowOffset(1,-1)
+    PerfFrame.text:SetShadowColor(0,0,0)
+end
+local baseC = select(1, GetTextColorTables())
+PerfFrame.text:SetTextColor(baseC.r, baseC.g, baseC.b)
+
+-- =========================================
+-- OnUpdate handler
+-- =========================================
 local lastUpdate = 0
     local function OnUpdateFunc(self, elapsed)
         if PerfFrameDB and PerfFrameDB.disabled then
