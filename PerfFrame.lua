@@ -7,9 +7,11 @@ local L =
     (ns and ns.L) or
     setmetatable(
         {},
-        {__index = function(t, k)
+        {
+            __index = function(t, k)
                 return k
-            end}
+            end
+        }
     )
 local PF = ns.PF
 
@@ -422,6 +424,7 @@ else
 end
 
 -- Apply saved position during load/login (survives disable/enable)
+local PFVis
 local PFPos = CreateFrame("Frame")
 PFPos:RegisterEvent("ADDON_LOADED")
 PFPos:RegisterEvent("PLAYER_LOGIN")
@@ -467,21 +470,23 @@ PFPos:SetScript(
         PerfFrame_ApplySavedPosition()
 
         -- Combat visibility handler (Always/Only in combat/Hide in combat)
-        local PFVis = CreateFrame("Frame")
-        PFVis:RegisterEvent("PLAYER_REGEN_DISABLED")
-        PFVis:RegisterEvent("PLAYER_REGEN_ENABLED")
-        PFVis:RegisterEvent("PLAYER_ENTERING_WORLD")
-        PFVis:SetScript(
-            "OnEvent",
-            function()
-                if PerfFrame_UpdateVisibility then
-                    PerfFrame_UpdateVisibility()
+        if not PFVis then
+            PFVis = CreateFrame("Frame")
+            PFVis:RegisterEvent("PLAYER_REGEN_DISABLED")
+            PFVis:RegisterEvent("PLAYER_REGEN_ENABLED")
+            PFVis:RegisterEvent("PLAYER_ENTERING_WORLD")
+            PFVis:SetScript(
+                "OnEvent",
+                function()
+                    if PerfFrame_UpdateVisibility then
+                        PerfFrame_UpdateVisibility()
+                    end
+                    if PerfFrameDB and PerfFrameDB.disabled then
+                        PerfFrame_SetDisabled(true)
+                    end
                 end
-                if PerfFrameDB and PerfFrameDB.disabled then
-                    PerfFrame_SetDisabled(true)
-                end
-            end
-        )
+            )
+        end
     end
 )
 
