@@ -703,7 +703,7 @@ CF:SetScript(
         local safe_GetAddOnInfo = C_AddOns and C_AddOns.GetAddOnInfo or GetAddOnInfo
         local safe_GetAddOnMemoryUsage = C_AddOns and C_AddOns.GetAddOnMemoryUsage or GetAddOnMemoryUsage
 
-        function setupTooltip()
+        local function setupTooltip()
             PerfFrame:SetScript("OnEnter", nil)
             PerfFrame:SetScript("OnLeave", nil)
 
