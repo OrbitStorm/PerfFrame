@@ -1,6 +1,6 @@
-## Interface: 120000, 120001
+## Interface: 120005
 ## Title: PerfFrame
-## Version: v2.3.2
+## Version: v2.3.3
 ## Author: Sawfty
 ## Notes: Lightweight frame that displays your FPS and latency so you can blame lag with confidence.
 ## DefaultState: Enabled
