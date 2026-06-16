@@ -1,6 +1,6 @@
-## Interface: 50503, 50504
+## Interface: 50504
 ## Title: PerfFrame
-## Version: v2.3.3
+## Version: v2.3.4
 ## Author: Sawfty
 ## Notes: Lightweight frame that displays your FPS and latency so you can blame lag with confidence.
 ## DefaultState: Enabled
